@@ -27,10 +27,10 @@ Long-term features (after 1.0):
 
 The following features existing in Lager cannot be supported because we are just wrapping Erlang's `error_logger`:
 
-  * Switching in between sync and async modes.
+  * Switching between sync and async modes.
   * New warnings levels.
 
-Notice it is unclear how the `Logger` module API will look like for now. We could implement the logging functinality with macros but it is unclear how well it would play with the configuration system. We also need remember to keep the API extensible for future features coming in the mid-term, like metadata.
+Notice it is unclear what the `Logger` module API will look like for now. We could implement the logging functinality with macros but it is unclear how well it would play with the configuration system. We also need remember to keep the API extensible for future features coming in the mid-term, like metadata.
 
 ## LICENSE
 
