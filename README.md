@@ -17,6 +17,7 @@ Short-term features (before 1.0):
   * Extensions to the `Inspect` protocol to allow us to customize the maximum data size in bytes (so we never try to log a binary of 100MB).
   * An `IO.format/2` function that understands Erlang's `io:format/2` formats.
   * An error handler that supports high watermark (as seen in Lager) to limit the amount of messages we print per second (so we never bring the node down due to excessive messages, see [cascading-failures](https://github.com/ferd/cascading-failures)).
+  * Consider SASL reports as info messages.
 
 Long-term features (after 1.0):
 
