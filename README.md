@@ -5,7 +5,7 @@ The goal of this project is to explore a Logger implementation that will be incl
 
 Obviously, one of the first questions may be: why not Lager? We need a project that knows how to log terms in Elixir syntax, in particular, using the `Inspect` protocol. That's why the focus of this project is on the error handler and not on the error logger itself.
 
-By default logger will run on top of OTP's `error_logger` and we will include an API that mostly wrapps the `error_logger` one. However we hope this project provides the proper API so someone can easily implement an elixir handler for Lager too.
+By default `Logger` will run on top of OTP's `error_logger` and we will include an API that mostly wraps the `error_logger` one. However we hope this project provides the proper API so someone can easily implement an elixir handler for Lager too.
 
 ## Features
 
@@ -20,7 +20,7 @@ Short-term features (before 1.0):
 
 Long-term features (after 1.0):
 
-  * Error translators, so we can translate GenServer and other OTP errors into something more pallatable.
+  * Error translators, so we can translate GenServer and other OTP errors into something more palatable.
   * Custom formatting, so we can change the format of logging or add ANSI colors.
   * Logging to files and log rotation.
   * Metadata (like file, line and module) and tracing, the existing logging format used by the error logger may allow us to pass metadata into the logger and therefore support tracing.
@@ -30,7 +30,7 @@ The following features existing in Lager cannot be supported because we are just
   * Switching between sync and async modes.
   * New warnings levels.
 
-Notice it is unclear what the `Logger` module API will look like for now. We could implement the logging functinality with macros but it is unclear how well it would play with the configuration system. We also need remember to keep the API extensible for future features coming in the mid-term, like metadata.
+Notice it is unclear what the `Logger` module API will look like for now. We could implement the logging functionality with macros but it is unclear how well it would play with the configuration system. We also need remember to keep the API extensible for future features coming in the mid-term, like metadata.
 
 ## LICENSE
 
