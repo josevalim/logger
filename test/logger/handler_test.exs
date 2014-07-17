@@ -12,6 +12,12 @@ defmodule Logger.HandlerTest do
     assert error_logger(:info_msg, "~p~n", [:hello]) =~ regex("[info] :hello\n")
   end
 
+  test "formats logger messages" do
+    assert logger(:info, "hello") =~ regex("[info] hello")
+    assert logger(:error, "hello") =~ regex("[error] hello")
+    assert logger(:warning, "hello") =~ regex("[warning] hello")
+  end
+
   test "formats error_logger info message" do
     assert error_logger(:info_msg, "hello", []) =~ regex("[info] hello")
     assert error_logger(:info_msg, "~p~n", [:hello]) =~ regex("[info] :hello\n")
@@ -49,6 +55,13 @@ defmodule Logger.HandlerTest do
 
   defp regex(msg) do
     ~r/^\d\d\d\d\-\d\d\-\d\d \d\d:\d\d:\d\d #{Regex.escape(msg)}$/
+  end
+
+  defp logger(level, message) do
+    capture_io(:user, fn ->
+      Logger.log(level, message)
+      :error_logger.tty(true) # Wait until the message is printed
+    end)
   end
 
   defp error_logger(fun, format) do

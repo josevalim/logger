@@ -17,7 +17,7 @@ defmodule Logger.Watcher do
   end
 
   # TODO: We need to log the handler died
-  def handle_info({:gen_event_EXIT, @handler, reason}, state) do
+  def handle_info({:gen_event_EXIT, @handler, _reason}, state) do
     install_handler()
     {:noreply, state}
   end

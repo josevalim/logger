@@ -13,20 +13,22 @@ Below we detail the features we plan to include in the short-term, long-term or 
 
 Short-term features (before 1.0):
 
-  * A `Logger` module to log warning, info and error messages.
+  * *done* A `Logger` module to log warning, info and error messages.
+  * *done* A backend that can print log messages using Elixir terms.
+  * *done* A watcher to ensure the handler is registered even if it crashes.
   * Extensions to the `Inspect` protocol to allow us to customize the maximum data size in bytes (so we never try to log a binary of 100MB).
-  * An `IO.format/2` function that understands Erlang's `io:format/2` formats.
   * An error handler that supports high watermark (as seen in Lager) to limit the amount of messages we print per second (so we never bring the node down due to excessive messages, see [cascading-failures](https://github.com/ferd/cascading-failures)).
   * Error translators, so we can translate GenServer and other OTP errors into something more palatable.
   * Custom formatting, so we can change the format of logging or add ANSI colors.
-  * A watcher to ensure the handler is registered even if it crashes.
+  * A way to lazily calculate the log messages to avoid generating expensive log messages that won't be used.
 
 Long-term features (after 1.0):
 
   * Print SASL reports.
   * Logging to files and log rotation.
-  * Metadata (like file, line and module) and tracing, the existing logging format used by the error logger may allow us to pass metadata into the logger and therefore support tracing.
+  * Metadata (like file, line and module) and tracing.
   * Switching between sync and async modes.
+  * Support a logger that redirects messages for testing.
 
 The following features won't be supported to stay closer to Erlang's logger:
 
