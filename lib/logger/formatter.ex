@@ -18,8 +18,11 @@ defmodule Logger.Formatter do
   end
 
   def inspect(format, args, opts) when is_list(format) do
-    do_inspect(format, args, [], [], opts)
+    do_inspect(format, args, opts)
   end
+
+  defp do_inspect(format, [], _opts),  do: {format, []}
+  defp do_inspect(format, args, opts), do: do_inspect(format, args, [], [], opts)
 
   defp do_inspect([?~|t], args, used_format, used_args, opts) do
     {t, args, cc_format, cc_args} = collect_cc(:width, t, args, [?~], [], opts)

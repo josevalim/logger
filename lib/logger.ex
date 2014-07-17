@@ -1,19 +1,45 @@
 defmodule Logger do
   use Application
 
-  # See http://elixir-lang.org/docs/stable/elixir/Application.html
-  # for more information on OTP Applications
+  @moduledoc """
+  A logger able to format in Elixir terms.
+
+  ## Handlers
+
+  The supported handlers are:
+
+    * `:tty` - log entries to the terminal
+
+  """
+
+  @type handler :: :tty
+  @handlers [:tty]
+
+  @doc false
   def start(_type, _args) do
-    import Supervisor.Spec, warn: false
+    :error_logger.add_report_handler(Logger.Handler, :ok)
 
-    children = [
-      # Define workers and child supervisors to be supervised
-      # worker(Logger.Worker, [arg1, arg2, arg3])
-    ]
+    case :error_logger.delete_report_handler(:error_logger_tty_h) do
+      {:error, :module_not_found} -> :ok
+      _ -> enable(:tty)
+    end
 
-    # See http://elixir-lang.org/docs/stable/elixir/Supervisor.html
-    # for other strategies and supported options
-    opts = [strategy: :one_for_one, name: Logger.Supervisor]
-    Supervisor.start_link(children, opts)
+    Supervisor.start_link([], strategy: :one_for_one)
+  end
+
+  @doc """
+  Enables a logger handler.
+  """
+  @spec enable(handler) :: :ok
+  def enable(handler) when handler in @handlers do
+    GenEvent.call(:error_logger, Logger.Handler, {:enable, handler})
+  end
+
+  @doc """
+  Disables a logger handler.
+  """
+  @spec disable(handler) :: :ok
+  def disable(handler) when handler in @handlers do
+    GenEvent.call(:error_logger, Logger.Handler, {:disable, handler})
   end
 end
