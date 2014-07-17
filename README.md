@@ -7,6 +7,26 @@ Obviously, one of the first questions may be: why not Lager? We need a project t
 
 By default `Logger` will run on top of OTP's `error_logger` and we will include an API that mostly wraps the `error_logger` one. However we hope this project provides the proper API so someone can easily implement an elixir handler for Lager too.
 
+## Installation
+
+Add `:logger` as a dependency to your `mix.exs` file:
+
+```elixir
+defp deps do
+  [{:logger, github: "josevalim/logger"}]
+end
+```
+
+You should also update your application list to include `:logger`:
+
+```elixir
+def application do
+  [applications: [:logger]]
+end
+```
+
+Logger is not published on Hex as we intend to merge it into Elixir before 1.0.
+
 ## Features
 
 Below we detail the features we plan to include in the short-term, long-term or when it does not apply.
