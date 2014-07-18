@@ -13,7 +13,11 @@ defmodule Logger.Mixfile do
   # Type `mix help compile.app` for more information
   def application do
     [applications: [],
-     mod: {Logger, []}]
+     mod: {Logger, []},
+     env: [truncate: 8096,
+           backends: [:tty],
+           handle_otp_reports: true,
+           handle_sasl_reports: true]]
   end
 
   # Dependencies can be hex.pm packages:

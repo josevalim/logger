@@ -10,12 +10,12 @@ defmodule Logger.Case do
     end
   end
 
+  def msg(msg) do
+    ~r/^\d\d\d\d\-\d\d\-\d\d \d\d:\d\d:\d\d #{Regex.escape(msg)}$/
+  end
+
   def wait_for_handler() do
-    if Logger.Handler in GenEvent.which_handlers(:error_logger) do
-      # TODO: We should not need this. We need to store
-      # the handler data somewhere so it is able to recover.
-      GenEvent.call(:error_logger, Logger.Handler, {:enable, :tty})
-    else
+    unless Logger.ErrorHandler in GenEvent.which_handlers(:error_logger) do
       :timer.sleep(10)
       wait_for_handler()
     end
@@ -24,7 +24,8 @@ defmodule Logger.Case do
   def capture_log(fun) do
     capture_io(:user, fn ->
       fun.()
-      :gen_event.which_handlers(:error_logger)
+      GenEvent.which_handlers(:error_logger)
+      GenEvent.which_handlers(Logger)
     end)
   end
 end

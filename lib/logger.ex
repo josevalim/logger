@@ -13,73 +13,101 @@ defmodule Logger do
     * `:warn` - for warnings
     * `:error` - for errors
 
-  ## Handlers
-
-  The supported handlers are:
-
-    * `:tty` - log entries to the terminal
-
   ## Configuration
+
+    * `:backends` - the backends to be used. Defaults to `[:tty]`
+      only. See the "Backends" section for more information.
 
     * `:truncate` - the maximum message size to be logged. Defaults
       to 8192 bytes. Note this configuration is approximate. Truncated
       messages will have "(truncated)" at the end.
 
+    * `:handle_otp_reports` - redirects OTP reports to Logger so
+      they are formatted in Elixir terms. This uninstalls Erlang's
+      logger that prints terms to terminal. This configuration must
+      be set before the application starts and defaults to true.
+
+    * `:handle_sasl_reports` - redirects SASL reports to Logger so
+      they are formatted in Elixir terms. This uninstalls SASL's
+      logger that prints terms to terminal. This configuration must
+      be set before the application starts and defaults to true.
+      Note for this to work SASL must be started *before* Logger.
+
   At runtime, `Logger.configure/1` must be used to configure Logger
-  options, which guarantees the configuration is serialized.
+  options, which guarantees the configuration is serialized and
+  properly reloaded.
+
+  ## Backends
+
+  The supported backends are:
+
+    * `:tty` - log entries to the terminal (enabled by default)
 
   ## Comparison to :error_logger
 
-  Elixir's Logger is built on top of Erlang's
-  [`:error_logger`](http://www.erlang.org/doc/man/error_logger.html).
+  Elixir's Logger includes many improvements over OTP's
+  `error_logger` as such as:
 
-  For this reason, when Logger is started, Elixir looks if the Erlang
-  error logger is bound to tty and replaces it by its own that is
-  able to format messages in Elixir's format.
+    * it adds a new log level named debug.
 
-  Furthermore, Elixir's Logger includes many improvements on top
-  of Erlang's `error_logger`:
+    * it guarantees event handlers are restarted on crash.
 
-    * Logger adds a new level, specific to Elixir logger,
-      named debug.
-
-    * Logger event handler process is watched over which guarantees
-      it is restarted in case of crashes.
-
-    * Logger formats messages on the client to avoid clogging
+    * it formats messages on the client to avoid clogging
       the logger event manager.
 
-    * Logger truncates error messages to avoid large log messages.
+    * it truncates error messages to avoid large log messages.
 
   """
 
   @type handler :: :tty
-  @type level :: :error | :info | :warning | :debug
+  @type level :: :error | :info | :warn | :debug
+
+  @levels [:error, :info, :warn, :debug]
 
   @doc false
   def start(_type, _args) do
     import Supervisor.Spec
 
-    children   = [worker(Logger.Watcher, [])]
-    options    = [strategy: :one_for_one, name: Logger.Supervisor]
+    options  = [strategy: :one_for_one, name: Logger.Supervisor]
+    children = [worker(GenEvent, [[name: Logger]]),
+                supervisor(Logger.Watcher, []),
+                worker(Logger.Config, [])]
+
     {:ok, sup} = Supervisor.start_link(children, options)
 
-    tty_was_enabled? =
-      case :error_logger.delete_report_handler(:error_logger_tty_h) do
-        {:error, :module_not_found} -> false
-        _ -> enable(:tty); true
-      end
+    otp_reports?   = Application.get_env(:logger, :handle_otp_reports)
+    sasl_reports?  = Application.get_env(:logger, :handle_sasl_reports)
+    reenable_tty?  = delete_error_logger_handler(otp_reports?, :error_logger_tty_h)
+    reenable_sasl? = delete_error_logger_handler(sasl_reports?, :sasl_report_tty_h)
+    Logger.Watcher.watch(:error_logger, Logger.ErrorHandler, {otp_reports?, sasl_reports?})
 
-    {:ok, sup, tty_was_enabled?}
+    # TODO: Start this based on the backends config
+    # TODO: Runtime backend configuration
+    Logger.Watcher.watch(Logger, Logger.Backends.TTY, :ok)
+
+    {:ok, sup, {reenable_tty?, reenable_sasl?}}
   end
 
   @doc false
-  def stop(tty_was_enabled?) do
-    :error_logger.tty(tty_was_enabled?)
+  def stop({reenable_tty?, reenable_sasl?}) do
+    add_error_logger_handler(reenable_tty?, :error_logger_tty_h)
+    add_error_logger_handler(reenable_sasl?, :sasl_report_tty_h)
+
     # We need to do this in another process as the Application
     # Controller is currently blocked shutting down this app.
-    spawn_link(fn -> Logger.Watcher.clear_data end)
+    spawn_link(fn -> Logger.Config.clear_data end)
+
     :ok
+  end
+
+  defp add_error_logger_handler(was_enabled?, handler) do
+    was_enabled? and :error_logger.add_report_handler(handler)
+    :ok
+  end
+
+  defp delete_error_logger_handler(should_delete?, handler) do
+    should_delete? and
+      :error_logger.delete_report_handler(handler) != {:error, :module_not_found}
   end
 
   @doc """
@@ -89,7 +117,7 @@ defmodule Logger do
   for the available options.
   """
   def configure(options) do
-    Logger.Watcher.configure(options)
+    Logger.Config.configure(options)
   end
 
   @doc """
@@ -102,15 +130,16 @@ defmodule Logger do
   Use this function only when there is a need to log dynamically
   or you want to explicitly avoid embedding metadata.
   """
-  @spec log(level, IO.chardata, Keyword.t) :: :ok
-  def log(level, chardata, metadata \\ [])
-      when is_list(metadata) and (is_list(chardata) or is_binary(chardata)) do
-    case Logger.Watcher.__data__ do
-      {truncate, _} ->
-        notify(level, truncate(chardata, truncate), metadata)
-      nil ->
-        raise "Cannot log messages, the :logger application is not running"
+  @spec log(level, IO.chardata | (() -> IO.chardata), Keyword.t) :: :ok
+  def log(level, chardata, metadata \\ []) when level in @levels and is_list(metadata) do
+    # TODO: Consider log level
+    # TODO: Handle async/sync modes
+    unless Process.whereis(Logger) do
+      raise "Cannot log messages, the :logger application is not running"
     end
+
+    {truncate, _} = Logger.Config.__data__
+    notify(level, truncate(chardata, truncate), metadata)
   end
 
   @doc """
@@ -118,12 +147,12 @@ defmodule Logger do
 
   ## Examples
 
-    Logger.warning "knob turned too much to the right"
+    Logger.warn "knob turned too much to the right"
 
   """
   defmacro warn(chardata, metadata \\ []) do
     quote do
-      Logger.log(:warning, unquote(chardata), unquote(metadata))
+      Logger.log(:warn, unquote(chardata), unquote(metadata))
     end
   end
 
@@ -157,6 +186,11 @@ defmodule Logger do
 
   @doc """
   Logs a debug message.
+
+  ## Examples
+
+      Logger.debug "hello?"
+
   """
   defmacro debug(chardata, metadata \\ []) do
     quote do
@@ -164,42 +198,17 @@ defmodule Logger do
     end
   end
 
-  # @doc """
-  # Enables a logger handler.
-  # """
-  # @spec enable(handler) :: :ok
-  defp enable(handler) do
-    GenEvent.call(:error_logger, Logger.Handler, {:enable, handler})
+  defp truncate(data, n) when is_function(data, 0) do
+    Logger.Formatter.truncate(data.(), n)
   end
 
-  # @doc """
-  # Disables a logger handler.
-  # """
-  # @spec disable(handler) :: :ok
-  # defp disable(handler) do
-  #   GenEvent.call(:error_logger, Logger.Handler, {:disable, handler})
-  # end
-
-  defp truncate(data, n) do
+  defp truncate(data, n) when is_list(data) or is_binary(data) do
     Logger.Formatter.truncate(data, n)
   end
 
-  defp notify(:debug, chardata, metadata) do
-    send(:error_logger,
-      {:debug,
-       Process.group_leader(),
-       {self(), {Logger, metadata}, chardata}})
-    :ok
-  end
-
   defp notify(level, chardata, metadata) do
-    GenEvent.notify(:error_logger,
-      {level_to_report(level),
-       Process.group_leader(),
-       {self(), {Logger, metadata}, chardata}})
+    GenEvent.notify(Logger,
+      {level, Process.group_leader(),
+        {self(), {Logger, metadata}, chardata}})
   end
-
-  defp level_to_report(:warning), do: :warning_report
-  defp level_to_report(:error),   do: :error_report
-  defp level_to_report(:info),    do: :info_report
 end
