@@ -1,3 +1,7 @@
+# v0.2.0
+
+* [Logger] Provide logging with debug level via sideband data 
+
 # v0.1.0
 
 * [Logger] Logger provides API for emitting error/info/warning messages

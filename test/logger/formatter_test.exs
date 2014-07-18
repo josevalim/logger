@@ -1,5 +1,5 @@
 defmodule Logger.FormatterTest do
-  use ExUnit.Case, async: true
+  use Logger.Case, async: true
 
   import Kernel, except: [inspect: 2]
   import Logger.Formatter

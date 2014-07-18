@@ -8,6 +8,7 @@ defmodule Logger do
 
   The supported levels are:
 
+    * `:debug` - for debug-related messages
     * `:info` - for information of any kind
     * `:warn` - for warnings
     * `:error` - for errors
@@ -18,7 +19,12 @@ defmodule Logger do
 
     * `:tty` - log entries to the terminal
 
-  ## Implementation notes
+  ## Configuration
+
+    * `:truncate` - the maximum message size to be logged. Defaults
+      to 10_000 bytes. Note this configuration is approximate.
+
+  ## Comparison to :error_logger
 
   Elixir's Logger is built on top of Erlang's
   [`:error_logger`](http://www.erlang.org/doc/man/error_logger.html).
@@ -30,16 +36,19 @@ defmodule Logger do
   Furthermore, Elixir's Logger includes many improvements on top
   of Erlang's `error_logger`:
 
+    * Logger adds a new level, specific to Elixir logger,
+      named debug.
+
     * Logger is watched over which guarantees it is restarted
-      in case of crashes;
+      in case of crashes.
 
     * Logger formats message on the client to avoid clogging
-      the logger event manager
+      the logger event manager.
 
   """
 
   @type handler :: :tty
-  @type level :: :error | :info | :warning
+  @type level :: :error | :info | :warning | :debug
 
   @doc false
   def start(_type, _args) do
@@ -60,9 +69,9 @@ defmodule Logger do
   @doc """
   Logs a message.
 
-  Developers should rather use the macros `Logger.warn/2`,
-  `Logger.info/2` or `Logger.error/2` instead of this function
-  as they automatically include caller metadata.
+  Developers should rather use the macros `Logger.debug/2`,
+  `Logger.warn/2`, `Logger.info/2` or `Logger.error/2` instead
+  of this function as they automatically include caller metadata.
 
   Use this function only when there is a need to log dynamically
   or you want to explicitly avoid embedding metadata.
@@ -70,10 +79,7 @@ defmodule Logger do
   @spec log(level, IO.chardata, Keyword.t) :: :ok
   def log(level, chardata, metadata \\ [])
       when is_list(metadata) and (is_list(chardata) or is_binary(chardata)) do
-    GenEvent.notify(:error_logger,
-      {level_to_report(level),
-       Process.group_leader(),
-       {self(), {Logger, metadata}, chardata}})
+    notify(level, chardata, metadata)
   end
 
   @doc """
@@ -118,6 +124,15 @@ defmodule Logger do
     end
   end
 
+  @doc """
+  Logs a debug message.
+  """
+  defmacro debug(chardata, metadata \\ []) do
+    quote do
+      Logger.log(:debug, unquote(chardata), unquote(metadata))
+    end
+  end
+
   # @doc """
   # Enables a logger handler.
   # """
@@ -133,6 +148,21 @@ defmodule Logger do
   # defp disable(handler) do
   #   GenEvent.call(:error_logger, Logger.Handler, {:disable, handler})
   # end
+
+  defp notify(:debug, chardata, metadata) do
+    send(:error_logger,
+      {:debug,
+       Process.group_leader(),
+       {self(), {Logger, metadata}, chardata}})
+    :ok
+  end
+
+  defp notify(level, chardata, metadata) do
+    GenEvent.notify(:error_logger,
+      {level_to_report(level),
+       Process.group_leader(),
+       {self(), {Logger, metadata}, chardata}})
+  end
 
   defp level_to_report(:warning), do: :warning_report
   defp level_to_report(:error),   do: :error_report

@@ -39,7 +39,7 @@ Short-term features (before 1.0):
   * Extensions to the `Inspect` protocol to allow us to customize the maximum data size in bytes (so we never try to log a binary of 100MB).
   * An error handler that supports high watermark (as seen in Lager) to limit the amount of messages we print per second (so we never bring the node down due to excessive messages, see [cascading-failures](https://github.com/ferd/cascading-failures)).
   * Error translators, so we can translate GenServer and other OTP errors into something more palatable.
-  * Custom formatting, so we can change the format of logging or add ANSI colors.
+  * Custom formatting.
   * A way to lazily calculate the log messages to avoid generating expensive log messages that won't be used.
 
 Long-term features (after 1.0):
@@ -48,11 +48,6 @@ Long-term features (after 1.0):
   * Logging to files and log rotation.
   * Metadata (like file, line and module) and tracing.
   * Switching between sync and async modes.
-  * Support a logger that redirects messages for testing.
-
-The following features won't be supported to stay closer to Erlang's logger:
-
-  * New warnings levels.
 
 Notice it is unclear what the `Logger` module API will look like for now. We could implement the logging functionality with macros but it is unclear how well it would play with the configuration system. We also need remember to keep the API extensible for future features coming in the mid-term, like metadata.
 

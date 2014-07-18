@@ -2,8 +2,9 @@ defmodule Logger.Handler do
   use GenEvent
 
   def init(_) do
+    # TODO: Consider the user when calculating the handlers state
+    # No user means tty is always disabled.
     if user = Process.whereis(:user) do
-      Process.link(user)
       Process.group_leader(self(), user)
     end
 
@@ -41,9 +42,16 @@ defmodule Logger.Handler do
 
   ## Handle info
 
-  def handle_info({:EXIT, user, _reason}, %{user: user} = state) do
-    # If the user process is dead, remove :tty from the list of handlers
-    {:ok, update_in(state.handlers, &List.delete(&1, :tty))}
+  @offband_levels [:debug]
+
+  def handle_info({type, gl, _msg} = event, state) when node(gl) != node() and type in @offband_levels do
+    send {:error_logger, node(gl)}, event
+    {:ok, state}
+  end
+
+  def handle_info({type, _gl, _msg} = event, state) when type in @offband_levels do
+    state = log_event(event, state)
+    {:ok, state}
   end
 
   def handle_info(_, state) do
@@ -51,6 +59,9 @@ defmodule Logger.Handler do
   end
 
   ## Helpers
+
+  defp log_event({:debug, _gl, {pid, {Logger, meta}, format}}, state),
+    do: log_event(:debug, :message, pid, format, meta, state)
 
   defp log_event({:error, _gl, {pid, format, data}}, state),
     do: log_event(:error, :format, pid, {format, data}, [], state)
@@ -80,9 +91,10 @@ defmodule Logger.Handler do
     do: state
 
   # TODO: Support custom formatters (new line is a formatter concern)
-  # TODO: Support level
   # TODO: Support high watermark
   # TODO: Add node to report if node(pid) != node()
+  # TODO: Support level for erlang messages (elixir ones are handled on client)
+  # TODO: Truncate erlang messages (elixir ones are truncated on client)
   defp log_event(level, kind, pid, data, _metadata, state) do
     formatted = format_event(level, kind, data)
     time = :erlang.universaltime
@@ -111,6 +123,7 @@ defmodule Logger.Handler do
   defp pad(int), do: Integer.to_string(int)
 
   defp format_level(:warning), do: "[warning]"
+  defp format_level(:debug),   do: "[debug]"
   defp format_level(:error),   do: "[error]"
   defp format_level(:info),    do: "[info]"
 end

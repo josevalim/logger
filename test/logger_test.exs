@@ -1,17 +1,29 @@
 defmodule LoggerTest do
-  use ExUnit.Case
+  use Logger.Case
 
   require Logger
 
   test "warn/2" do
-    assert Logger.warn("warning", []) == :ok
+    capture_log fn ->
+      assert Logger.warn("warning", []) == :ok
+    end
   end
 
   test "error/2" do
-    assert Logger.error("error", []) == :ok
+    capture_log fn ->
+      assert Logger.error("error", []) == :ok
+    end
   end
 
   test "info/2" do
-    assert Logger.info("info", []) == :ok
+    capture_log fn ->
+      assert Logger.info("info", []) == :ok
+    end
+  end
+
+  test "debug/2" do
+    capture_log fn ->
+      assert Logger.debug("debug", []) == :ok
+    end
   end
 end
