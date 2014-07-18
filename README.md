@@ -37,10 +37,10 @@ Short-term features (before 1.0):
   * *done* A backend that can print log messages using Elixir terms.
   * *done* A watcher to ensure the handler is registered even if it crashes.
   * *done* Data truncation so we never try to log a message of megabytes of size.
-  * An error handler that supports high watermark (as seen in Lager) to limit the amount of messages we print per second (so we never bring the node down due to excessive messages, see [cascading-failures](https://github.com/ferd/cascading-failures)).
+  * *done* A way to lazily calculate the log messages to avoid generating expensive log messages that won't be used.
+  * An error handler that supports a threshold (as seen in Lager) to limit the amount of messages we print per second (so we never bring the node down due to excessive messages, see [cascading-failures](https://github.com/ferd/cascading-failures)).
   * Error translators, so we can translate GenServer and other OTP errors into something more palatable.
   * Custom formatting.
-  * A way to lazily calculate the log messages to avoid generating expensive log messages that won't be used.
   * Switching between sync and async modes.
 
 Long-term features (after 1.0):

@@ -1,7 +1,8 @@
 # v0.2.0
 
-* [Logger] Provide logging with debug level
-* [Logger] Provide data truncation
+* [Logger] Add debug level
+* [Logger] Add data truncation
+* [Logger] Add lazily calculated messages with functions
 
 # v0.1.0
 

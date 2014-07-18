@@ -147,7 +147,8 @@ defmodule Logger do
 
   ## Examples
 
-    Logger.warn "knob turned too much to the right"
+      Logger.warn "knob turned too much to the right"
+      Logger.warn fn -> "expensive to calculate warning" end
 
   """
   defmacro warn(chardata, metadata \\ []) do
@@ -162,6 +163,7 @@ defmodule Logger do
   ## Examples
 
       Logger.info "mission accomplished"
+      Logger.info fn -> "expensive to calculate info" end
 
   """
   defmacro info(chardata, metadata \\ []) do
@@ -176,6 +178,7 @@ defmodule Logger do
   ## Examples
 
       Logger.error "oops"
+      Logger.error fn -> "expensive to calculate error" end
 
   """
   defmacro error(chardata, metadata \\ []) do
@@ -190,6 +193,7 @@ defmodule Logger do
   ## Examples
 
       Logger.debug "hello?"
+      Logger.debug fn -> "expensive to calculate debug" end
 
   """
   defmacro debug(chardata, metadata \\ []) do
