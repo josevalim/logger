@@ -7,11 +7,22 @@ defmodule Logger.HandlerTest do
     assert error_log(:info_msg, "~p~n", [:hello]) =~ regex("[info] :hello\n")
   end
 
+  ## Elixir formatting
+
   test "formats logger messages" do
     assert log(:info, "hello") =~ regex("[info] hello")
     assert log(:debug, "hello") =~ regex("[debug] hello")
     assert log(:error, "hello") =~ regex("[error] hello")
     assert log(:warning, "hello") =~ regex("[warning] hello")
+  end
+
+  ## Erlang formatting
+
+  test "truncates messages" do
+    Logger.configure(truncate: 4)
+    assert error_log(:info_msg, "hello", []) =~ regex("[info] hell (truncated)")
+  after
+    Logger.configure(truncate: 8096)
   end
 
   test "formats error_logger info message" do

@@ -61,57 +61,71 @@ defmodule Logger.Handler do
   ## Helpers
 
   defp log_event({:debug, _gl, {pid, {Logger, meta}, format}}, state),
-    do: log_event(:debug, :message, pid, format, meta, state)
+    do: elixir_event(:debug, pid, format, meta, state)
 
   defp log_event({:error, _gl, {pid, format, data}}, state),
-    do: log_event(:error, :format, pid, {format, data}, [], state)
+    do: erlang_event(:error, :format, pid, {format, data}, state)
   defp log_event({:error_report, _gl, {pid, :std_error, format}}, state),
-    do: log_event(:error, :report, pid, format, [], state)
+    do: erlang_event(:error, :report, pid, format, state)
   defp log_event({:error_report, _gl, {pid, {Logger, meta}, format}}, state),
-    do: log_event(:error, :message, pid, format, meta, state)
+    do: elixir_event(:error, pid, format, meta, state)
   defp log_event({:error_report, _gl, _}, state),
     do: state
 
   defp log_event({:warning_msg, _gl, {pid, format, data}}, state),
-    do: log_event(:warning, :format, pid, {format, data}, [], state)
+    do: erlang_event(:warning, :format, pid, {format, data}, state)
   defp log_event({:warning_report, _gl, {pid, :std_warning, format}}, state),
-    do: log_event(:warning, :report, pid, format, [], state)
+    do: erlang_event(:warning, :report, pid, format, state)
   defp log_event({:warning_report, _gl, {pid, {Logger, meta}, format}}, state),
-    do: log_event(:warning, :message, pid, format, meta, state)
+    do: elixir_event(:warning, pid, format, meta, state)
   defp log_event({:warning_report, _gl, _}, state),
     do: state
 
   defp log_event({:info_msg, _gl, {pid, format, data}}, state),
-    do: log_event(:info, :format, pid, {format, data}, [], state)
+    do: erlang_event(:info, :format, pid, {format, data}, state)
   defp log_event({:info_report, _gl, {pid, :std_info, format}}, state),
-    do: log_event(:info, :report, pid, format, [], state)
+    do: erlang_event(:info, :report, pid, format, state)
   defp log_event({:info_report, _gl, {pid, {Logger, meta}, format}}, state),
-    do: log_event(:info, :message, pid, format, meta, state)
+    do: elixir_event(:info, pid, format, meta, state)
   defp log_event({:info_report, _gl, _}, state),
     do: state
 
-  # TODO: Support custom formatters (new line is a formatter concern)
   # TODO: Support high watermark
-  # TODO: Add node to report if node(pid) != node()
   # TODO: Support level for erlang messages (elixir ones are handled on client)
   # TODO: Truncate erlang messages (elixir ones are truncated on client)
-  defp log_event(level, kind, pid, data, _metadata, state) do
-    formatted = format_event(level, kind, data)
+
+  defp erlang_event(level, kind, pid, data, state) do
+    {truncate, _min_level} = Logger.Watcher.__data__()
+    formatted = Logger.Formatter.truncate(format_event(level, kind, data), truncate)
     time = :erlang.universaltime
     for handler <- state.handlers do
-      log_event(handler, time, level, pid, formatted)
+      print_event(handler, time, level, pid, formatted)
     end
     state
   end
 
-  defp format_event(_level, :message, format), do: [format, ?\n]
+  # For Elixir events, level filtering, throttleing and
+  # truncation happens in the client, so we just need to
+  # print the event.
+  defp elixir_event(level, pid, msg, _metadata, state) do
+    formatted = [msg, ?\n]
+    time = :erlang.universaltime
+    for handler <- state.handlers do
+      print_event(handler, time, level, pid, formatted)
+    end
+    state
+  end
+
   defp format_event(_level, :report, format), do: [Kernel.inspect(format), ?\n]
   defp format_event(_level, :format, {format, args}) do
     {format, args} = Logger.Formatter.inspect(format, args)
     :io_lib.format(format, args)
   end
 
-  defp log_event(:tty, time, level, _pid, formatted) do
+  # TODO: Support per-handler printer (new line is a printer concern)
+  # TODO: Add node to report if node(pid) != node()
+
+  defp print_event(:tty, time, level, _pid, formatted) do
     :io.put_chars :user, [format_time(time), ?\s, format_level(level), ?\s, formatted]
   end
 
