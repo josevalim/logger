@@ -4,6 +4,78 @@ defmodule Logger.Formatter do
   @moduledoc false
 
   @doc """
+  Truncates a char data into n bytes.
+
+  There is a chance we truncate in the middle of a grapheme
+  cluster but we never truncate in the middle of a binary
+  codepoint. For this reason, truncation is not exact.
+  """
+  @spec truncate(IO.chardata, non_neg_integer) :: IO.chardata
+  def truncate(chardata, n) when n >= 0 do
+    {chardata, n} = do_truncate(chardata, n)
+    if n >= 0, do: chardata, else: [chardata, " (truncated)"]
+  end
+
+  defp do_truncate(binary, n) when is_binary(binary) do
+    remaining = n - byte_size(binary)
+    if remaining < 0 do
+      # There is a chance we are cutting at the wrong
+      # place so we need to fix the binary.
+      {fix_binary(binary_part(binary, 0, n)), remaining}
+    else
+      {binary, remaining}
+    end
+  end
+
+  defp do_truncate(int, n) when int in 0..127,                      do: {int, n-1}
+  defp do_truncate(int, n) when int in 127..0x07FF,                 do: {int, n-2}
+  defp do_truncate(int, n) when int in 0x800..0xFFFF,               do: {int, n-3}
+  defp do_truncate(int, n) when int >= 0x10000 and is_integer(int), do: {int, n-4}
+
+  defp do_truncate(list, n) when is_list(list) do
+    do_truncate_list(list, n, [])
+  end
+
+  defp do_truncate_list([h|t], n, acc) do
+    {h, n} = do_truncate(h, n)
+    if n < 0 do
+      {:lists.reverse(acc), n}
+    else
+      do_truncate_list(t, n, [h|acc])
+    end
+  end
+
+  defp do_truncate_list([], n, acc) do
+    {:lists.reverse(acc), n}
+  end
+
+  defp do_truncate_list(t, n, acc) do
+    {t, n} = do_truncate(t, n)
+    {:lists.reverse(acc, t), n}
+  end
+
+  defp fix_binary(binary) do
+    # Use a thirteen-bytes offset to look back in the binary.
+    # This should allow at least two codepoints of 6 bytes.
+    suffix_size = min(byte_size(binary), 13)
+    prefix_size = byte_size(binary) - suffix_size
+    <<prefix :: binary-size(prefix_size), suffix :: binary-size(suffix_size)>> = binary
+    prefix <> fix_binary(suffix, "")
+  end
+
+  defp fix_binary(<<h::utf8, t::binary>>, acc) do
+    acc <> <<h::utf8>> <> fix_binary(t, "")
+  end
+
+  defp fix_binary(<<h, t::binary>>, acc) do
+    fix_binary(t, <<h, acc::binary>>)
+  end
+
+  defp fix_binary(<<>>, _acc) do
+    <<>>
+  end
+
+  @doc """
   Receives a format string and arguments and replace `~p`,
   `~P`, `~w` and `~W` by its inspected variants.
   """

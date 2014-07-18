@@ -4,9 +4,6 @@ defmodule Logger.HandlerTest do
   test "survives after crashes" do
     assert error_log(:info_msg, "~p~n", []) == ""
     wait_for_handler()
-    # TODO: We should not need this. We need to store
-    # the handler data somewhere so it is able to recover.
-    GenEvent.call(:error_logger, Logger.Handler, {:enable, :tty})
     assert error_log(:info_msg, "~p~n", [:hello]) =~ regex("[info] :hello\n")
   end
 
@@ -70,12 +67,5 @@ defmodule Logger.HandlerTest do
 
   defp do_error_log(fun, args) do
     capture_log(fn -> apply(:error_logger, fun, args) end)
-  end
-
-  defp wait_for_handler() do
-    unless Logger.Handler in GenEvent.which_handlers(:error_logger) do
-      :timer.sleep(10)
-      wait_for_handler()
-    end
   end
 end

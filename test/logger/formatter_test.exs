@@ -4,6 +4,30 @@ defmodule Logger.FormatterTest do
   import Kernel, except: [inspect: 2]
   import Logger.Formatter
 
+  test "truncate/2" do
+    # ASCII binaries
+    assert truncate("foo", 4) == "foo"
+    assert truncate("foo", 3) == "foo"
+    assert truncate("foo", 2) == ["fo", " (truncated)"]
+
+    # UTF-8 binaries
+    assert truncate("olá", 2) == ["ol", " (truncated)"]
+    assert truncate("olá", 3) == ["ol", " (truncated)"]
+    assert truncate("olá", 4) == "olá"
+    assert truncate("ááááá:", 10)  == ["ááááá", " (truncated)"]
+    assert truncate("áááááá:", 10) == ["ááááá", " (truncated)"]
+
+    # Charlists
+    assert truncate('olá', 2) == ['ol', " (truncated)"]
+    assert truncate('olá', 3) == ['ol', " (truncated)"]
+    assert truncate('olá', 4) == 'olá'
+
+    # Chardata
+    assert truncate('ol' ++ "á", 2) == ['ol' ++ "", " (truncated)"]
+    assert truncate('ol' ++ "á", 3) == ['ol' ++ "", " (truncated)"]
+    assert truncate('ol' ++ "á", 4) == 'ol' ++ "á"
+  end
+
   test "inspect/2 formats" do
     assert inspect('~p', [1]) == {'~ts', ["1"]}
     assert inspect("~p", [1]) == {'~ts', ["1"]}

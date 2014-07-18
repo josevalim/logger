@@ -1,6 +1,7 @@
 # v0.2.0
 
-* [Logger] Provide logging with debug level via sideband data 
+* [Logger] Provide logging with debug level
+* [Logger] Provide data truncation
 
 # v0.1.0
 

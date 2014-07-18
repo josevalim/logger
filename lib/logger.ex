@@ -22,7 +22,11 @@ defmodule Logger do
   ## Configuration
 
     * `:truncate` - the maximum message size to be logged. Defaults
-      to 10_000 bytes. Note this configuration is approximate.
+      to 8192 bytes. Note this configuration is approximate. Truncated
+      messages will have "(truncated)" at the end.
+
+  At runtime, `Logger.configure/1` must be used to configure Logger
+  options, which guarantees the configuration is serialized.
 
   ## Comparison to :error_logger
 
@@ -39,11 +43,13 @@ defmodule Logger do
     * Logger adds a new level, specific to Elixir logger,
       named debug.
 
-    * Logger is watched over which guarantees it is restarted
-      in case of crashes.
+    * Logger event handler process is watched over which guarantees
+      it is restarted in case of crashes.
 
-    * Logger formats message on the client to avoid clogging
+    * Logger formats messages on the client to avoid clogging
       the logger event manager.
+
+    * Logger truncates error messages to avoid large log messages.
 
   """
 
@@ -58,12 +64,32 @@ defmodule Logger do
     options    = [strategy: :one_for_one, name: Logger.Supervisor]
     {:ok, sup} = Supervisor.start_link(children, options)
 
-    case :error_logger.delete_report_handler(:error_logger_tty_h) do
-      {:error, :module_not_found} -> :ok
-      _ -> enable(:tty)
-    end
+    tty_was_enabled? =
+      case :error_logger.delete_report_handler(:error_logger_tty_h) do
+        {:error, :module_not_found} -> false
+        _ -> enable(:tty); true
+      end
 
-    {:ok, sup}
+    {:ok, sup, tty_was_enabled?}
+  end
+
+  @doc false
+  def stop(tty_was_enabled?) do
+    :error_logger.tty(tty_was_enabled?)
+    # We need to do this in another process as the Application
+    # Controller is currently blocked shutting down this app.
+    spawn_link(fn -> Logger.Watcher.clear_data end)
+    :ok
+  end
+
+  @doc """
+  Configures the logger.
+
+  See the "Configuration" section in `Logger` module documentation
+  for the available options.
+  """
+  def configure(options) do
+    Logger.Watcher.configure(options)
   end
 
   @doc """
@@ -79,7 +105,12 @@ defmodule Logger do
   @spec log(level, IO.chardata, Keyword.t) :: :ok
   def log(level, chardata, metadata \\ [])
       when is_list(metadata) and (is_list(chardata) or is_binary(chardata)) do
-    notify(level, chardata, metadata)
+    case Logger.Watcher.__data__ do
+      {truncate, _} ->
+        notify(level, truncate(chardata, truncate), metadata)
+      nil ->
+        raise "Cannot log messages, the :logger application is not running"
+    end
   end
 
   @doc """
@@ -148,6 +179,10 @@ defmodule Logger do
   # defp disable(handler) do
   #   GenEvent.call(:error_logger, Logger.Handler, {:disable, handler})
   # end
+
+  defp truncate(data, n) do
+    Logger.Formatter.truncate(data, n)
+  end
 
   defp notify(:debug, chardata, metadata) do
     send(:error_logger,
