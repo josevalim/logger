@@ -2,7 +2,7 @@ defmodule Logger do
   use Application
 
   @moduledoc """
-  A info, warning or error logger.
+  A logger for Elixir applications.
 
   ## Level
 
@@ -13,7 +13,7 @@ defmodule Logger do
     * `:warn` - for warnings
     * `:error` - for errors
 
-  ## Configuration
+  ## Logger Configuration
 
     * `:backends` - the backends to be used. Defaults to `[:tty]`
       only. See the "Backends" section for more information.
@@ -22,20 +22,34 @@ defmodule Logger do
       to 8192 bytes. Note this configuration is approximate. Truncated
       messages will have "(truncated)" at the end.
 
-    * `:handle_otp_reports` - redirects OTP reports to Logger so
-      they are formatted in Elixir terms. This uninstalls Erlang's
-      logger that prints terms to terminal. This configuration must
-      be set before the application starts and defaults to true.
-
-    * `:handle_sasl_reports` - redirects SASL reports to Logger so
-      they are formatted in Elixir terms. This uninstalls SASL's
-      logger that prints terms to terminal. This configuration must
-      be set before the application starts and defaults to true.
-      Note for this to work SASL must be started *before* Logger.
-
   At runtime, `Logger.configure/1` must be used to configure Logger
   options, which guarantees the configuration is serialized and
   properly reloaded.
+
+  ## Erlang's error_logger redirect configuration
+
+  The following configuration applies to the Logger functionality
+  where messages sent to Erlang's error_logger are redirected to
+  to Logger.
+
+  All the configurations below must be set before the application
+  starts in order to take effect.
+
+    * `:handle_otp_reports` - redirects OTP reports to Logger so
+      they are formatted in Elixir terms. This uninstalls Erlang's
+      logger that prints terms to terminal.
+
+    * `:handle_sasl_reports` - redirects SASL reports to Logger so
+      they are formatted in Elixir terms. This uninstalls SASL's
+      logger that prints terms to terminal as long as the SASL
+      application is started before Logger.
+
+    * `:discard_threshold_for_error_logger` - a value that, when
+      reached, triggers the error logger to discard messages. This
+      value must be a positive number that represents the maximum
+      number of messages accepted per second. Once above this
+      threshold, the error_logger enters in discard mode for the
+      remaining of that second.
 
   ## Backends
 
@@ -43,10 +57,9 @@ defmodule Logger do
 
     * `:tty` - log entries to the terminal (enabled by default)
 
-  ## Comparison to :error_logger
+  ## Comparison to Erlang's error_logger
 
-  Elixir's Logger includes many improvements over OTP's
-  `error_logger` as such as:
+  Logger includes many improvements over OTP's error logger such as:
 
     * it adds a new log level named debug.
 
@@ -79,7 +92,10 @@ defmodule Logger do
     sasl_reports?  = Application.get_env(:logger, :handle_sasl_reports)
     reenable_tty?  = delete_error_logger_handler(otp_reports?, :error_logger_tty_h)
     reenable_sasl? = delete_error_logger_handler(sasl_reports?, :sasl_report_tty_h)
-    Logger.Watcher.watch(:error_logger, Logger.ErrorHandler, {otp_reports?, sasl_reports?})
+
+    threshold = Application.get_env(:logger, :discard_threshold_for_error_logger)
+    Logger.Watcher.watch(:error_logger, Logger.ErrorHandler,
+      {otp_reports?, sasl_reports?, threshold})
 
     # TODO: Start this based on the backends config
     # TODO: Runtime backend configuration

@@ -3,7 +3,7 @@ defmodule Logger.Mixfile do
 
   def project do
     [app: :logger,
-     version: "0.2.0-dev",
+     version: "0.2.0",
      elixir: "~> 0.14.3",
      deps: deps]
   end
@@ -17,7 +17,8 @@ defmodule Logger.Mixfile do
      env: [truncate: 8096,
            backends: [:tty],
            handle_otp_reports: true,
-           handle_sasl_reports: true]]
+           handle_sasl_reports: true,
+           discard_threshold_for_error_logger: 300]]
   end
 
   # Dependencies can be hex.pm packages:

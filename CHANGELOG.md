@@ -3,6 +3,7 @@
 * [Logger] Add debug level
 * [Logger] Add data truncation
 * [Logger] Add lazily calculated messages with functions
+* [Logger] Add a discard threshold for the error logger
 
 # v0.1.0
 
