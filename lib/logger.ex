@@ -49,7 +49,7 @@ defmodule Logger do
       value must be a positive number that represents the maximum
       number of messages accepted per second. Once above this
       threshold, the error_logger enters in discard mode for the
-      remaining of that second.
+      remaining of that second. Defaults to 500 messages.
 
   ## Backends
 

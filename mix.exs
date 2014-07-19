@@ -18,7 +18,7 @@ defmodule Logger.Mixfile do
            backends: [:tty],
            handle_otp_reports: true,
            handle_sasl_reports: true,
-           discard_threshold_for_error_logger: 300]]
+           discard_threshold_for_error_logger: 500]]
   end
 
   # Dependencies can be hex.pm packages:

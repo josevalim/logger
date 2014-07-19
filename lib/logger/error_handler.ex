@@ -15,35 +15,45 @@ defmodule Logger.ErrorHandler do
   end
 
   def handle_event(event, state) do
-    state = log_event(event, state)
+    state = check_threshold(state)
+    log_event(event, state)
     {:ok, state}
   end
 
   ## Helpers
 
-  defp log_event({:error, _gl, {_pid, format, data}}, %{otp: true} = state),
-    do: log_event(:error, :format, {format, data}, state)
-  defp log_event({:error_report, _gl, {_pid, :std_error, format}}, %{otp: true} = state),
-    do: log_event(:error, :report, format, state)
+  defp log_event({:error, _gl, {pid, format, data}}, %{otp: true}),
+    do: log_event(:error, :format, pid, {format, data})
+  defp log_event({:error_report, _gl, {pid, :std_error, format}}, %{otp: true}),
+    do: log_event(:error, :report, pid, format)
 
-  defp log_event({:warning_msg, _gl, {_pid, format, data}}, %{otp: true} = state),
-    do: log_event(:warn, :format, {format, data}, state)
-  defp log_event({:warning_report, _gl, {_pid, :std_warning, format}}, %{otp: true} = state),
-    do: log_event(:warn, :report, format, state)
+  defp log_event({:warning_msg, _gl, {pid, format, data}}, %{otp: true}),
+    do: log_event(:warn, :format, pid, {format, data})
+  defp log_event({:warning_report, _gl, {pid, :std_warning, format}}, %{otp: true}),
+    do: log_event(:warn, :report, pid, format)
 
-  defp log_event({:info_msg, _gl, {_pid, format, data}}, %{otp: true} = state),
-    do: log_event(:info, :format, {format, data}, state)
-  defp log_event({:info_report, _gl, {_pid, :std_info, format}}, %{otp: true} = state),
-    do: log_event(:info, :report, format, state)
+  defp log_event({:info_msg, _gl, {pid, format, data}}, %{otp: true}),
+    do: log_event(:info, :format, pid, {format, data})
+  defp log_event({:info_report, _gl, {pid, :std_info, format}}, %{otp: true}),
+    do: log_event(:info, :report, pid, format)
 
-  defp log_event(_, state),
-    do: state
+  defp log_event(_, _state),
+    do: :ok
 
-  defp log_event(level, kind, data, state) do
-    state = check_threshold(state)
-    Logger.log(level, fn -> format_event(level, kind, data) end)
-    state
+  defp log_event(level, kind, pid, data) do
+    # TODO: Check level here too
+    {truncate, _} = Logger.Config.__data__
+
+    # Mode is always async to avoid clogging the error_logger
+    GenEvent.notify(Logger,
+      {level, Process.group_leader(),
+        {ensure_pid(pid), {Logger, []}, format_event(level, kind, data, truncate)}})
+
+    :ok
   end
+
+  defp ensure_pid(pid) when is_pid(pid), do: pid
+  defp ensure_pid(_), do: self()
 
   defp check_threshold(%{last_time: last_time, last_length: last_length,
                          dropped: dropped, threshold: threshold} = state) do
@@ -83,9 +93,12 @@ defmodule Logger.ErrorHandler do
     end
   end
 
-  defp format_event(_level, :report, format), do: Kernel.inspect(format)
-  defp format_event(_level, :format, {format, args}) do
-    {format, args} = Logger.Formatter.inspect(format, args)
-    :io_lib.format(format, args)
+  defp format_event(_level, :report, format, truncate) do
+    Logger.Formatter.truncate(Kernel.inspect(format), truncate)
+  end
+
+  defp format_event(_level, :format, {format, args}, truncate) do
+    {format, args} = Logger.Formatter.inspect(format, args, truncate)
+    Logger.Formatter.truncate(:io_lib.format(format, args), truncate)
   end
 end

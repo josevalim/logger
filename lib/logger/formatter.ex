@@ -12,11 +12,15 @@ defmodule Logger.Formatter do
   """
   @spec truncate(IO.chardata, non_neg_integer) :: IO.chardata
   def truncate(chardata, n) when n >= 0 do
-    {chardata, n} = do_truncate(chardata, n)
+    {chardata, n} = truncate_n(chardata, n)
     if n >= 0, do: chardata, else: [chardata, " (truncated)"]
   end
 
-  defp do_truncate(binary, n) when is_binary(binary) do
+  defp truncate_n(_, n) when n < 0 do
+    {"", n}
+  end
+
+  defp truncate_n(binary, n) when is_binary(binary) do
     remaining = n - byte_size(binary)
     if remaining < 0 do
       # There is a chance we are cutting at the wrong
@@ -27,30 +31,30 @@ defmodule Logger.Formatter do
     end
   end
 
-  defp do_truncate(int, n) when int in 0..127,                      do: {int, n-1}
-  defp do_truncate(int, n) when int in 127..0x07FF,                 do: {int, n-2}
-  defp do_truncate(int, n) when int in 0x800..0xFFFF,               do: {int, n-3}
-  defp do_truncate(int, n) when int >= 0x10000 and is_integer(int), do: {int, n-4}
+  defp truncate_n(int, n) when int in 0..127,                      do: {int, n-1}
+  defp truncate_n(int, n) when int in 127..0x07FF,                 do: {int, n-2}
+  defp truncate_n(int, n) when int in 0x800..0xFFFF,               do: {int, n-3}
+  defp truncate_n(int, n) when int >= 0x10000 and is_integer(int), do: {int, n-4}
 
-  defp do_truncate(list, n) when is_list(list) do
-    do_truncate_list(list, n, [])
+  defp truncate_n(list, n) when is_list(list) do
+    truncate_n_list(list, n, [])
   end
 
-  defp do_truncate_list(_, n, acc) when n < 0 do
+  defp truncate_n_list(_, n, acc) when n < 0 do
     {:lists.reverse(acc), n}
   end
 
-  defp do_truncate_list([h|t], n, acc) do
-    {h, n} = do_truncate(h, n)
-    do_truncate_list(t, n, [h|acc])
+  defp truncate_n_list([h|t], n, acc) do
+    {h, n} = truncate_n(h, n)
+    truncate_n_list(t, n, [h|acc])
   end
 
-  defp do_truncate_list([], n, acc) do
+  defp truncate_n_list([], n, acc) do
     {:lists.reverse(acc), n}
   end
 
-  defp do_truncate_list(t, n, acc) do
-    {t, n} = do_truncate(t, n)
+  defp truncate_n_list(t, n, acc) do
+    {t, n} = truncate_n(t, n)
     {:lists.reverse(acc, t), n}
   end
 
@@ -79,22 +83,33 @@ defmodule Logger.Formatter do
   Receives a format string and arguments and replace `~p`,
   `~P`, `~w` and `~W` by its inspected variants.
   """
-  def inspect(format, args, opts \\ %Inspect.Opts{})
+  def inspect(format, args, truncate, opts \\ %Inspect.Opts{})
 
-  def inspect(format, args, opts) when is_atom(format) do
-    inspect(Atom.to_char_list(format), args, opts)
+  def inspect(format, args, truncate, opts) when is_atom(format) do
+    do_inspect(Atom.to_char_list(format), args, truncate, opts)
   end
 
-  def inspect(format, args, opts) when is_binary(format) do
-    inspect(:binary.bin_to_list(format), args, opts)
+  def inspect(format, args, truncate, opts) when is_binary(format) do
+    do_inspect(:binary.bin_to_list(format), args, truncate, opts)
   end
 
-  def inspect(format, args, opts) when is_list(format) do
-    do_inspect(format, args, opts)
+  def inspect(format, args, truncate, opts) when is_list(format) do
+    do_inspect(format, args, truncate, opts)
   end
 
-  defp do_inspect(format, [], _opts),  do: {format, []}
-  defp do_inspect(format, args, opts), do: do_inspect(format, args, [], [], opts)
+  defp do_inspect(format, [], _truncate, _opts), do: {format, []}
+  defp do_inspect(format, args, truncate, opts) do
+    # A pre-pass that removes binaries from
+    # arguments according to the truncate limit.
+    {args, _} = Enum.map_reduce(args, truncate, fn arg, acc ->
+      if is_binary(arg) do
+        truncate_n(arg, acc)
+      else
+        {arg, acc}
+      end
+    end)
+    do_inspect(format, args, [], [], opts)
+  end
 
   defp do_inspect([?~|t], args, used_format, used_args, opts) do
     {t, args, cc_format, cc_args} = collect_cc(:width, t, args, [?~], [], opts)

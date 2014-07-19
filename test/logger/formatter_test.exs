@@ -2,7 +2,9 @@ defmodule Logger.FormatterTest do
   use Logger.Case, async: true
 
   import Kernel, except: [inspect: 2]
-  import Logger.Formatter
+
+  defp truncate(arg, n),      do: Logger.Formatter.truncate(arg, n)
+  defp inspect(format, args), do: Logger.Formatter.inspect(format, args, 10)
 
   test "truncate/2" do
     # ASCII binaries
@@ -68,5 +70,13 @@ defmodule Logger.FormatterTest do
 
     assert inspect('~5lW', ['abc', 2]) ==
            {'~ts', [["[", "97", ",", " ", "98", ",", " ", "...", "]"]]}
+  end
+
+  test "inspect/2 truncates binaries" do
+    assert inspect('~ts', ["abcdeabcdeabcdeabcde"]) ==
+           {'~ts', ["abcdeabcde"]}
+
+    assert inspect('~ts~ts~ts', ["abcdeabcde", "abcde", "abcde"]) ==
+           {'~ts~ts~ts', ["abcdeabcde", "", ""]}
   end
 end
