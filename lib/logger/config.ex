@@ -1,7 +1,7 @@
 defmodule Logger.Config do
   @moduledoc false
 
-  use GenServer
+  use GenEvent
 
   @name __MODULE__
   @data :__data__
@@ -11,7 +11,7 @@ defmodule Logger.Config do
   end
 
   def configure(options) do
-    GenServer.call(@name, {:configure, options})
+    GenEvent.call(Logger, @name, {:configure, options})
   end
 
   def __data__() do
@@ -24,17 +24,17 @@ defmodule Logger.Config do
 
   ## Callbacks
 
-  def init(:ok) do
+  def init(_) do
     recompute_data()
     {:ok, %{}}
   end
 
-  def handle_call({:configure, options}, _from, state) do
+  def handle_call({:configure, options}, state) do
     Enum.each options, fn {key, value} ->
       Application.put_env(:logger, key, value)
     end
     recompute_data()
-    {:reply, :ok, state}
+    {:ok, state}
   end
 
   ## Helpers

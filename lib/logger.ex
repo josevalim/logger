@@ -83,10 +83,14 @@ defmodule Logger do
 
     options  = [strategy: :one_for_one, name: Logger.Supervisor]
     children = [worker(GenEvent, [[name: Logger]]),
-                supervisor(Logger.Watcher, []),
-                worker(Logger.Config, [])]
+                supervisor(Logger.Watcher, [])]
 
     {:ok, sup} = Supervisor.start_link(children, options)
+
+    # TODO: Start this based on the backends config
+    # TODO: Runtime backend configuration
+    Logger.Watcher.watch(Logger, Logger.Config, :ok)
+    Logger.Watcher.watch(Logger, Logger.Backends.TTY, :ok)
 
     otp_reports?   = Application.get_env(:logger, :handle_otp_reports)
     sasl_reports?  = Application.get_env(:logger, :handle_sasl_reports)
@@ -96,10 +100,6 @@ defmodule Logger do
     threshold = Application.get_env(:logger, :discard_threshold_for_error_logger)
     Logger.Watcher.watch(:error_logger, Logger.ErrorHandler,
       {otp_reports?, sasl_reports?, threshold})
-
-    # TODO: Start this based on the backends config
-    # TODO: Runtime backend configuration
-    Logger.Watcher.watch(Logger, Logger.Backends.TTY, :ok)
 
     {:ok, sup, {reenable_tty?, reenable_sasl?}}
   end
@@ -156,6 +156,7 @@ defmodule Logger do
 
     {truncate, _} = Logger.Config.__data__
     notify(level, truncate(chardata, truncate), metadata)
+    :ok
   end
 
   @doc """
