@@ -229,9 +229,8 @@ defmodule Logger do
     %{mode: mode, truncate: truncate, level: min_level} = Logger.Config.__data__
 
     if compare_levels(level, min_level) != :lt do
-      notify(mode, {level,
-                    Process.group_leader(),
-                    {self(), {Logger, metadata}, truncate(chardata, truncate)}})
+      tuple = {Logger, truncate(chardata, truncate), :os.timestamp, [pid: self()] ++ metadata}
+      notify(mode, {level, Process.group_leader(), tuple})
     end
 
     :ok
@@ -247,8 +246,9 @@ defmodule Logger do
 
   """
   defmacro warn(chardata, metadata \\ []) do
+    caller = caller_metadata(__CALLER__)
     quote do
-      Logger.log(:warn, unquote(chardata), unquote(metadata))
+      Logger.log(:warn, unquote(chardata), unquote(caller) ++ unquote(metadata))
     end
   end
 
@@ -262,8 +262,9 @@ defmodule Logger do
 
   """
   defmacro info(chardata, metadata \\ []) do
+    caller = caller_metadata(__CALLER__)
     quote do
-      Logger.log(:info, unquote(chardata), unquote(metadata))
+      Logger.log(:info, unquote(chardata), unquote(caller) ++ unquote(metadata))
     end
   end
 
@@ -277,8 +278,9 @@ defmodule Logger do
 
   """
   defmacro error(chardata, metadata \\ []) do
+    caller = caller_metadata(__CALLER__)
     quote do
-      Logger.log(:error, unquote(chardata), unquote(metadata))
+      Logger.log(:error, unquote(chardata), unquote(caller) ++ unquote(metadata))
     end
   end
 
@@ -292,9 +294,14 @@ defmodule Logger do
 
   """
   defmacro debug(chardata, metadata \\ []) do
+    caller = caller_metadata(__CALLER__)
     quote do
-      Logger.log(:debug, unquote(chardata), unquote(metadata))
+      Logger.log(:debug, unquote(chardata), unquote(caller) ++ unquote(metadata))
     end
+  end
+
+  defp caller_metadata(%{module: module, function: function, line: line}) do
+    [module: module, function: function, line: line]
   end
 
   defp truncate(data, n) when is_function(data, 0),

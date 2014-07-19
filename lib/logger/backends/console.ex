@@ -11,20 +11,19 @@ defmodule Logger.Backends.Console do
 
   ## Handle event
 
-  def handle_event({_type, gl, _msg}, state) when node(gl) != node() do
+  def handle_event({_level, gl, _event}, state) when node(gl) != node() do
     {:ok, state}
   end
 
-  def handle_event({type, _gl, {pid, {Logger, metadata}, message}}, state) do
-    log_event(type, pid, message, metadata, state)
+  def handle_event({level, _gl, {Logger, message, _timestamp, metadata}}, state) do
+    log_event(level, message, metadata, state)
     {:ok, state}
   end
 
   ## Helpers
 
-  # TODO: Add node to report if node(pid) != node()
   # TODO: Support custom formatting (new line is a formatting concern)
-  defp log_event(type, _pid, message, _metadata, _state) do
+  defp log_event(type, message, _metadata, _state) do
     time = :erlang.universaltime
     :io.put_chars :user, [format_time(time), ?\s, ?[, Atom.to_string(type), ?], ?\s, message, ?\n]
   end

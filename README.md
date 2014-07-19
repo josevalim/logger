@@ -44,11 +44,12 @@ Short-term features (before 1.0):
   * Custom formatting.
   * Custom backends.
   * SASL reports.
+  * Metadata (via options and process dictionary).
 
 Long-term features (after 1.0):
 
   * Logging to files and log rotation.
-  * Metadata (like file, line and module) and tracing.
+  * Tracing.
 
 ## LICENSE
 
