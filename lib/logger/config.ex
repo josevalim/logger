@@ -29,6 +29,15 @@ defmodule Logger.Config do
     {:ok, %{}}
   end
 
+  def handle_event({_type, gl, _msg} = event, state) when node(gl) != node() do
+    GenEvent.notify({Logger, node(gl)}, event) # Cross node messages are async
+    {:ok, state}
+  end
+
+  def handle_event(_event, state) do
+    {:ok, state}
+  end
+
   def handle_call({:configure, options}, state) do
     Enum.each options, fn {key, value} ->
       Application.put_env(:logger, key, value)
