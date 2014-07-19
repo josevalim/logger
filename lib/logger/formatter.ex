@@ -3,6 +3,55 @@ import Kernel, except: [inspect: 2]
 defmodule Logger.Formatter do
   @moduledoc false
 
+  @default_format [:date, " ", :time, " ", :color, "[", :severity, "] ",
+                    {:pid, ""},
+                    {:module, [
+                        {:pid, ["@"], ""},
+                        :module,
+                        {:function, [":", :function], ""},
+                        {:line, [":", :line], ""}
+                      ], ""},
+                      " ", :message, "\n"]
+
+  def format([], level, message, metadata) do
+    format(@default_format, level, message, metadata)
+  end
+
+  def format(config, level, message, metadata) do
+    metadata = add_time(metadata)
+    for c <- config, do
+      output(c, level, message, metadata)
+    end
+  end
+
+  defp output(:message, _, message, _), do: message
+  defp output(:date, _, message, meta), do: Map.fetch(:date)
+  defp output(:time, _, message, meta), do: Map.fetch(:time)
+  defp output(:severity, level, _, _),  do: Atom.to_string(level)
+  defp output(property, _, _, _, meta) when is_atom(property), do
+    Map.get(meta, property, "Undefined")
+  end 
+
+  defp output({property, default}, _, _, meta) when is_atom(property) && is_binary(default), do
+    Map.get(meta, property, default)
+  end
+
+  defp output({property, present, absent}, level, message, meta) when is_atom(property), do
+    case Map.fetch(property, meta) do
+      nil -> for c <- absent, do: output(c, level, message, meta)
+      val -> for c <- present, do: output(c, level, message, meta)
+    end
+  end
+
+  defp output(other, _, _, _), do: other
+
+  defp add_date_time(metadata) do
+    {date, time} = Logger.Utility.local_date_time()
+    metadata 
+      |> Map.put(:date, date)
+      |> Map.put(:time, time)
+  end
+
   @doc """
   Truncates a char data into n bytes.
 

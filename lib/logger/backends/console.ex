@@ -25,13 +25,7 @@ defmodule Logger.Backends.Console do
   # TODO: Support custom formatting (new line is a formatting concern)
   defp log_event(type, message, _metadata, _state) do
     time = :erlang.universaltime
-    :io.put_chars :user, [format_time(time), ?\s, ?[, Atom.to_string(type), ?], ?\s, message, ?\n]
+    :io.put_chars :user, [Logger.Utility.format_time(time), ?\s, ?[, Atom.to_string(type), ?], ?\s, message, ?\n]
   end
 
-  defp format_time({{yy, mm, dd}, {hh, mi, ss}}) do
-    [pad(yy), ?-, pad(mm), ?-, pad(dd), ?\s, pad(hh), ?:, pad(mi), ?:, pad(ss)]
-  end
-
-  defp pad(int) when int < 10, do: [?0, Integer.to_string(int)]
-  defp pad(int), do: Integer.to_string(int)
 end
