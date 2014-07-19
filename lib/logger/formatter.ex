@@ -36,13 +36,13 @@ defmodule Logger.Formatter do
     do_truncate_list(list, n, [])
   end
 
+  defp do_truncate_list(_, n, acc) when n < 0 do
+    {:lists.reverse(acc), n}
+  end
+
   defp do_truncate_list([h|t], n, acc) do
     {h, n} = do_truncate(h, n)
-    if n < 0 do
-      {:lists.reverse(acc), n}
-    else
-      do_truncate_list(t, n, [h|acc])
-    end
+    do_truncate_list(t, n, [h|acc])
   end
 
   defp do_truncate_list([], n, acc) do

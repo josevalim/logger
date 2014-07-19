@@ -20,7 +20,7 @@ defmodule Logger do
 
     * `:truncate` - the maximum message size to be logged. Defaults
       to 8192 bytes. Note this configuration is approximate. Truncated
-      messages will have "(truncated)" at the end.
+      messages will have " (truncated)" at the end.
 
   At runtime, `Logger.configure/1` must be used to configure Logger
   options, which guarantees the configuration is serialized and

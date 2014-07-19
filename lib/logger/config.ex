@@ -34,7 +34,7 @@ defmodule Logger.Config do
       Application.put_env(:logger, key, value)
     end
     recompute_data()
-    {:ok, state}
+    {:ok, :ok, state}
   end
 
   ## Helpers

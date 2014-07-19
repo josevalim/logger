@@ -18,8 +18,8 @@ defmodule Logger.FormatterTest do
     assert truncate("áááááá:", 10) == ["ááááá", " (truncated)"]
 
     # Charlists
-    assert truncate('olá', 2) == ['ol', " (truncated)"]
-    assert truncate('olá', 3) == ['ol', " (truncated)"]
+    assert truncate('olá', 2) == ['olá', " (truncated)"]
+    assert truncate('olá', 3) == ['olá', " (truncated)"]
     assert truncate('olá', 4) == 'olá'
 
     # Chardata
