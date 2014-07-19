@@ -1,4 +1,4 @@
-defmodule Logger.Backends.TTY do
+defmodule Logger.Backends.Console do
   use GenEvent
 
   def init(_) do

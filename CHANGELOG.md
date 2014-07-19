@@ -1,3 +1,9 @@
+# v0.3.0
+
+* [Logger] Requires Elixir master
+* [Logger] Improve truncation algorithms to avoid overflow
+* [Logger] Alternate between sync and async modes
+
 # v0.2.0
 
 * [Logger] Add debug level

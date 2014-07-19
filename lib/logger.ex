@@ -4,7 +4,24 @@ defmodule Logger do
   @moduledoc """
   A logger for Elixir applications.
 
-  ## Level
+  It includes many features:
+
+    * Provides debug, info, warn and error levels.
+
+    * Supports multiple backends which are automatically
+      supervised when plugged into Logger.
+
+    * Formats and truncates messages on the client
+      to avoid clogging logger backends.
+
+    * Alternates between sync and async modes to keep
+      it performant when required but also apply back-
+      pressure when under stress.
+
+    * Wraps OTP's error_logger to avoid it from
+      overflowing.
+
+  ## Levels
 
   The supported levels are:
 
@@ -13,27 +30,50 @@ defmodule Logger do
     * `:warn` - for warnings
     * `:error` - for errors
 
-  ## Logger Configuration
+  ## Configuration
 
-    * `:backends` - the backends to be used. Defaults to `[:tty]`
-      only. See the "Backends" section for more information.
+  Logger supports a wide range of configuration.
+
+  This configuration is split in three categories:
+
+    * Application configuration - must be set before the logger
+      application is started
+
+    * Runtime configuration - can be set before the logger
+      application is started but changed during runtime
+
+    * Error logger configuration - configuration for the
+      wrapper around OTP's error_logger
+
+  ### Application configuration
+
+  The following configuration must be set via config files
+  before the logger application is started.
+
+    * `:backends` - the backends to be used. Defaults to `[:console]`.
+      See the "Backends" section for more information.
+
+  ### Runtime Configuration
+
+  All configuration below can be set via the config files but also
+  changed dynamically during runtime via `Logger.configure/1`.
 
     * `:truncate` - the maximum message size to be logged. Defaults
       to 8192 bytes. Note this configuration is approximate. Truncated
       messages will have " (truncated)" at the end.
 
-  At runtime, `Logger.configure/1` must be used to configure Logger
-  options, which guarantees the configuration is serialized and
-  properly reloaded.
+    * `:sync_threshold` - if the logger manager has more than
+      `sync_threshold` messages in its queue, logger will change
+      to sync mode, to apply back-pressure to the clients.
+      Logger will return to sync mode once the number of messages
+      in the queue reduce to `sync_threshold * 0.75` messages.
+      Defaults to 20 messages.
 
-  ## Erlang's error_logger redirect configuration
+  ### Error logger configuration
 
-  The following configuration applies to the Logger functionality
-  where messages sent to Erlang's error_logger are redirected to
-  to Logger.
-
-  All the configurations below must be set before the application
-  starts in order to take effect.
+  The following configuration applies to the Logger wrapper around
+  Erlang's error_logger. All the configurations below must be set
+  before the logger application starts.
 
     * `:handle_otp_reports` - redirects OTP reports to Logger so
       they are formatted in Elixir terms. This uninstalls Erlang's
@@ -53,28 +93,31 @@ defmodule Logger do
 
   ## Backends
 
-  The supported backends are:
+  Logger supports different backends where log message are written to.
 
-    * `:tty` - log entries to the terminal (enabled by default)
+  The available backends by default are:
 
-  ## Comparison to Erlang's error_logger
+    * `:console` - Logs messages to the console (enabled by default)
 
-  Logger includes many improvements over OTP's error logger such as:
+  Developers may also implement their own backends, an option that
+  is explored with detail below.
 
-    * it adds a new log level named debug.
+  The initial backends are loaded via the `:backends` configuration,
+  which must be set before the logger application is started. However,
+  backends can be added or removed dynamically via the `add_backend/2`,
+  `remove_backend/1` and `configure_backend/2` functions.
 
-    * it guarantees event handlers are restarted on crash.
+  ### Console backend
 
-    * it formats messages on the client to avoid clogging
-      the logger event manager.
+  TODO
 
-    * it truncates error messages to avoid large log messages.
+  ### Custom backends
+
+  TODO
 
   """
 
-  @type handler :: :tty
   @type level :: :error | :info | :warn | :debug
-
   @levels [:error, :info, :warn, :debug]
 
   @doc false
@@ -90,7 +133,7 @@ defmodule Logger do
     # TODO: Start this based on the backends config
     # TODO: Runtime backend configuration
     Logger.Watcher.watch(Logger, Logger.Config, :ok)
-    Logger.Watcher.watch(Logger, Logger.Backends.TTY, :ok)
+    Logger.Watcher.watch(Logger, Logger.Backends.Console, :ok)
 
     otp_reports?   = Application.get_env(:logger, :handle_otp_reports)
     sasl_reports?  = Application.get_env(:logger, :handle_sasl_reports)
@@ -129,11 +172,11 @@ defmodule Logger do
   @doc """
   Configures the logger.
 
-  See the "Configuration" section in `Logger` module documentation
-  for the available options.
+  See the "Runtime Configuration" section in `Logger` module
+  documentation for the available options.
   """
   def configure(options) do
-    Logger.Config.configure(options)
+    Logger.Config.configure(Dict.take(options, [:sync_threshold, :truncate]))
   end
 
   @doc """
@@ -149,13 +192,14 @@ defmodule Logger do
   @spec log(level, IO.chardata | (() -> IO.chardata), Keyword.t) :: :ok
   def log(level, chardata, metadata \\ []) when level in @levels and is_list(metadata) do
     # TODO: Consider log level
-    # TODO: Handle async/sync modes
     unless Process.whereis(Logger) do
       raise "Cannot log messages, the :logger application is not running"
     end
 
-    {truncate, _} = Logger.Config.__data__
-    notify(level, truncate(chardata, truncate), metadata)
+    %{mode: mode, truncate: truncate, level: _level} = Logger.Config.__data__
+    notify(mode, {level,
+                  Process.group_leader(),
+                  {self(), {Logger, metadata}, truncate(chardata, truncate)}})
     :ok
   end
 
@@ -219,17 +263,11 @@ defmodule Logger do
     end
   end
 
-  defp truncate(data, n) when is_function(data, 0) do
-    Logger.Formatter.truncate(data.(), n)
-  end
+  defp truncate(data, n) when is_function(data, 0)
+    do: Logger.Formatter.truncate(data.(), n)
+  defp truncate(data, n) when is_list(data) or is_binary(data),
+    do: Logger.Formatter.truncate(data, n)
 
-  defp truncate(data, n) when is_list(data) or is_binary(data) do
-    Logger.Formatter.truncate(data, n)
-  end
-
-  defp notify(level, chardata, metadata) do
-    GenEvent.notify(Logger,
-      {level, Process.group_leader(),
-        {self(), {Logger, metadata}, chardata}})
-  end
+  defp notify(:sync, msg),  do: GenEvent.sync_notify(Logger, msg)
+  defp notify(:async, msg), do: GenEvent.notify(Logger, msg)
 end

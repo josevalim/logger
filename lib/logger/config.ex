@@ -25,32 +25,58 @@ defmodule Logger.Config do
   ## Callbacks
 
   def init(_) do
-    recompute_data()
-    {:ok, %{}}
+    # Use previous data if available in case this handler crashed.
+    state = __data__ || compute_state(:debug, :async)
+    {:ok, state}
   end
 
   def handle_event({_type, gl, _msg} = event, state) when node(gl) != node() do
-    GenEvent.notify({Logger, node(gl)}, event) # Cross node messages are async
+    # Cross node messages are always async which also
+    # means this handler won't crash in case there is
+    # no logger installed in the other node.
+    GenEvent.notify({Logger, node(gl)}, event)
     {:ok, state}
   end
 
   def handle_event(_event, state) do
-    {:ok, state}
+    {:message_queue_len, len} = Process.info(self(), :message_queue_len)
+
+    cond do
+      len > state.sync_threshold and state.mode == :async ->
+        state = %{state | mode: :sync}
+        persist(state)
+        {:ok, state}
+      len < state.async_threshold and state.mode == :sync ->
+        state = %{state | mode: :async}
+        persist(state)
+        {:ok, state}
+      true ->
+        {:ok, state}
+    end
   end
 
   def handle_call({:configure, options}, state) do
     Enum.each options, fn {key, value} ->
       Application.put_env(:logger, key, value)
     end
-    recompute_data()
-    {:ok, :ok, state}
+    {:ok, :ok, compute_state(state.level, state.mode)}
   end
 
   ## Helpers
 
-  defp recompute_data() do
-    truncate  = Application.get_env(:logger, :truncate, 8096)
-    log_level = nil # For now
-    Application.put_env(:logger, @data, {truncate, log_level})
+  defp compute_state(level, mode) do
+    truncate = Application.get_env(:logger, :truncate)
+    sync_threshold  = Application.get_env(:logger, :sync_threshold)
+    async_threshold = trunc(sync_threshold * 0.75)
+
+    state =
+      %{level: level, mode: mode, truncate: truncate,
+        sync_threshold: sync_threshold, async_threshold: async_threshold}
+    persist(state)
+    state
+  end
+
+  defp persist(state) do
+    Application.put_env(:logger, @data, state)
   end
 end

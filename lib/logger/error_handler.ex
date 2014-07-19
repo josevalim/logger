@@ -42,7 +42,7 @@ defmodule Logger.ErrorHandler do
 
   defp log_event(level, kind, pid, data) do
     # TODO: Check level here too
-    {truncate, _} = Logger.Config.__data__
+    %{level: _level, truncate: truncate} = Logger.Config.__data__
 
     # Mode is always async to avoid clogging the error_logger
     GenEvent.notify(Logger,

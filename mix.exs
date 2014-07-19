@@ -15,7 +15,8 @@ defmodule Logger.Mixfile do
     [applications: [],
      mod: {Logger, []},
      env: [truncate: 8096,
-           backends: [:tty],
+           backends: [:console],
+           sync_threshold: 20,
            handle_otp_reports: true,
            handle_sasl_reports: true,
            discard_threshold_for_error_logger: 500]]
