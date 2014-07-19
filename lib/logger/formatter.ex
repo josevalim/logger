@@ -183,7 +183,7 @@ defmodule Logger.Formatter do
     data =
       data
       |> Inspect.Algebra.to_doc(opts)
-      |> Inspect.Algebra.pretty(opts.width)
+      |> Inspect.Algebra.format(opts.width)
     {t, args, 'st~', [data]}
   end
 
