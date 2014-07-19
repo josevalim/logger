@@ -14,13 +14,7 @@ defmodule Logger.Mixfile do
   def application do
     [applications: [],
      mod: {Logger, []},
-     env: [level: :debug,
-           truncate: 8096,
-           backends: [:console],
-           sync_threshold: 20,
-           handle_otp_reports: true,
-           handle_sasl_reports: true,
-           discard_threshold_for_error_logger: 500]]
+     env: []]
   end
 
   # Dependencies can be hex.pm packages:

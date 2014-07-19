@@ -229,7 +229,7 @@ defmodule Logger do
     %{mode: mode, truncate: truncate, level: min_level} = Logger.Config.__data__
 
     if compare_levels(level, min_level) != :lt do
-      tuple = {Logger, truncate(chardata, truncate), :os.timestamp, [pid: self()] ++ metadata}
+      tuple = {Logger, truncate(chardata, truncate), Logger.Utility.timestamp(), [pid: self()] ++ metadata}
       notify(mode, {level, Process.group_leader(), tuple})
     end
 

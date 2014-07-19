@@ -49,9 +49,8 @@ defmodule Logger.ErrorHandler do
       # Mode is always async to avoid clogging the error_logger
       GenEvent.notify(Logger,
         {level, Process.group_leader(),
-          {Logger, message, :os.timestamp, [pid: ensure_pid(pid)]}})
+          {Logger, message, Logger.Utility.timestamp(), [pid: ensure_pid(pid)]}})
     end
-
     :ok
   end
 

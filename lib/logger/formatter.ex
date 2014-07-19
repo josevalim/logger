@@ -2,55 +2,66 @@ import Kernel, except: [inspect: 2]
 
 defmodule Logger.Formatter do
   @moduledoc false
+  @valid_patterns [:time, :date, :message, :level, :node, :metadata]
+  @default_pattern "$time $metadata [$level] $message\n"
 
-  @default_format [:date, " ", :time, " ", :color, "[", :severity, "] ",
-                    {:pid, ""},
-                    {:module, [
-                        {:pid, ["@"], ""},
-                        :module,
-                        {:function, [":", :function], ""},
-                        {:line, [":", :line], ""}
-                      ], ""},
-                      " ", :message, "\n"]
+  def compile(nil), do: compile(@default_pattern)
 
-  def format([], level, message, metadata) do
-    format(@default_format, level, message, metadata)
-  end
-
-  def format(config, level, message, metadata) do
-    metadata = add_time(metadata)
-    for c <- config, do
-      output(c, level, message, metadata)
+  def compile({mod, fun}) when is_atom(mod) and is_atom(fun), do: {mod, fun}
+  @doc ~S"""
+      iex> Logger.Formatter.compile("$time $metadata [$level] $message\n")
+      [:time, " ", :metadata, " [", :level, "] ", :message, "\n"]
+  """
+  @spec compile(binary) :: list()
+  def compile(str) do
+    for code <- Regex.split(~r/(\$[a-z]+)/, str, trim: true) do
+      if String.starts_with?(code, "$") do
+        code = code |> String.slice(1..-1) |> String.to_atom
+      end
+      compile_code(code)
     end
   end
 
-  defp output(:message, _, message, _), do: message
-  defp output(:date, _, message, meta), do: Map.fetch(:date)
-  defp output(:time, _, message, meta), do: Map.fetch(:time)
-  defp output(:severity, level, _, _),  do: Atom.to_string(level)
-  defp output(property, _, _, _, meta) when is_atom(property), do
-    Map.get(meta, property, "Undefined")
+
+  defp compile_code(other) when is_binary(other), do: other
+  defp compile_code(key) when is_atom(key) do
+    unless Enum.member?(@valid_patterns, key) do
+      raise ArgumentError, message: "$#{key} is an invalid format pattern."
+    end
+    key
+  end
+
+  def format({mod, fun}, level, ts, msg, md) do
+    unless Enum.member?(mod.__info__(:functions), {fun, 4}) do
+      raise ArgumentError, message: "#{mod} needs to define #{fun}\4, ex: format(level, ts, msg, meta)"
+    end
+    Module.function(mod, fun, 4).(level, ts, msg, md)
+  end
+
+  def format(config, level, ts, msg, meta) do
+    for c <- config do
+      output(c, level, ts, msg, meta)
+    end
+  end
+
+  defp output(:message, _, _,  message, _), do: message
+  defp output(:date, _, ts, _, _) do 
+    {date, _} = Logger.Utility.format_time(ts)
+    date
+  end
+
+  defp output(:time, _, ts, _, _) do
+    {_, time} = Logger.Utility.format_time(ts)
+    time
+  end
+  defp output(:level, level, _, _, _), do: Atom.to_char_list(level)
+  defp output(:node, _, _, _, _),  do: Kernel.inspect(node())
+  defp output(:metadata, _, _, _, meta) do
+    meta 
+      |> Enum.map(fn {key, val} -> "#{key}=#{Kernel.inspect(val)}" end)
+      |> Enum.join(" ")
   end 
-
-  defp output({property, default}, _, _, meta) when is_atom(property) && is_binary(default), do
-    Map.get(meta, property, default)
-  end
-
-  defp output({property, present, absent}, level, message, meta) when is_atom(property), do
-    case Map.fetch(property, meta) do
-      nil -> for c <- absent, do: output(c, level, message, meta)
-      val -> for c <- present, do: output(c, level, message, meta)
-    end
-  end
-
-  defp output(other, _, _, _), do: other
-
-  defp add_date_time(metadata) do
-    {date, time} = Logger.Utility.local_date_time()
-    metadata 
-      |> Map.put(:date, date)
-      |> Map.put(:time, time)
-  end
+  defp output(other, _, _, _, _), do: other
 
   @doc """
   Truncates a char data into n bytes.
