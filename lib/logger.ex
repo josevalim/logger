@@ -58,6 +58,11 @@ defmodule Logger do
   All configuration below can be set via the config files but also
   changed dynamically during runtime via `Logger.configure/1`.
 
+    * `:level` - the logging level. Attempting to log any message
+      with severity less than the configured level will simply
+      cause the message to be ignored. Keep in mind that each backend
+      may have its specific level too.
+
     * `:truncate` - the maximum message size to be logged. Defaults
       to 8192 bytes. Note this configuration is approximate. Truncated
       messages will have " (truncated)" at the end.
@@ -170,13 +175,42 @@ defmodule Logger do
   end
 
   @doc """
+  Retrieves the logger level.
+
+  The logger level can be changed via `configure/1`.
+  """
+  @spec level() :: level
+  def level() do
+    check_logger!
+    %{level: level} = Logger.Config.__data__
+    level
+  end
+
+  @doc """
+  Compare log levels.
+
+  Receives to log levels and compares the `left`
+  against `right` and returns `:lt`, `:eq` or `:gt`.
+  """
+  @spec compare_levels(level, level) :: :lt | :eq | :gt
+  def compare_levels(level, level), do:
+    :eq
+  def compare_levels(left, right), do:
+    if(level_to_number(left) > level_to_number(right), do: :gt, else: :lt)
+
+  defp level_to_number(:debug), do: 0
+  defp level_to_number(:info),  do: 1
+  defp level_to_number(:warn),  do: 2
+  defp level_to_number(:error), do: 3
+
+  @doc """
   Configures the logger.
 
   See the "Runtime Configuration" section in `Logger` module
   documentation for the available options.
   """
   def configure(options) do
-    Logger.Config.configure(Dict.take(options, [:sync_threshold, :truncate]))
+    Logger.Config.configure(Dict.take(options, [:sync_threshold, :truncate, :level]))
   end
 
   @doc """
@@ -191,15 +225,15 @@ defmodule Logger do
   """
   @spec log(level, IO.chardata | (() -> IO.chardata), Keyword.t) :: :ok
   def log(level, chardata, metadata \\ []) when level in @levels and is_list(metadata) do
-    # TODO: Consider log level
-    unless Process.whereis(Logger) do
-      raise "Cannot log messages, the :logger application is not running"
+    check_logger!
+    %{mode: mode, truncate: truncate, level: min_level} = Logger.Config.__data__
+
+    if compare_levels(level, min_level) != :lt do
+      notify(mode, {level,
+                    Process.group_leader(),
+                    {self(), {Logger, metadata}, truncate(chardata, truncate)}})
     end
 
-    %{mode: mode, truncate: truncate, level: _level} = Logger.Config.__data__
-    notify(mode, {level,
-                  Process.group_leader(),
-                  {self(), {Logger, metadata}, truncate(chardata, truncate)}})
     :ok
   end
 
@@ -263,11 +297,17 @@ defmodule Logger do
     end
   end
 
-  defp truncate(data, n) when is_function(data, 0)
+  defp truncate(data, n) when is_function(data, 0),
     do: Logger.Formatter.truncate(data.(), n)
   defp truncate(data, n) when is_list(data) or is_binary(data),
     do: Logger.Formatter.truncate(data, n)
 
   defp notify(:sync, msg),  do: GenEvent.sync_notify(Logger, msg)
   defp notify(:async, msg), do: GenEvent.notify(Logger, msg)
+
+  defp check_logger! do
+    unless Process.whereis(Logger) do
+      raise "Cannot log messages, the :logger application is not running"
+    end
+  end
 end

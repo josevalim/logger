@@ -26,7 +26,7 @@ defmodule Logger.Config do
 
   def init(_) do
     # Use previous data if available in case this handler crashed.
-    state = __data__ || compute_state(:debug, :async)
+    state = __data__ || compute_state(:async)
     {:ok, state}
   end
 
@@ -59,13 +59,15 @@ defmodule Logger.Config do
     Enum.each options, fn {key, value} ->
       Application.put_env(:logger, key, value)
     end
-    {:ok, :ok, compute_state(state.level, state.mode)}
+    {:ok, :ok, compute_state(state.mode)}
   end
 
   ## Helpers
 
-  defp compute_state(level, mode) do
+  defp compute_state(mode) do
+    level    = Application.get_env(:logger, :level)
     truncate = Application.get_env(:logger, :truncate)
+
     sync_threshold  = Application.get_env(:logger, :sync_threshold)
     async_threshold = trunc(sync_threshold * 0.75)
 

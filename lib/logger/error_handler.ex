@@ -41,13 +41,14 @@ defmodule Logger.ErrorHandler do
     do: :ok
 
   defp log_event(level, kind, pid, data) do
-    # TODO: Check level here too
-    %{level: _level, truncate: truncate} = Logger.Config.__data__
+    %{level: min_level, truncate: truncate} = Logger.Config.__data__
 
-    # Mode is always async to avoid clogging the error_logger
-    GenEvent.notify(Logger,
-      {level, Process.group_leader(),
-        {ensure_pid(pid), {Logger, []}, format_event(level, kind, data, truncate)}})
+    if Logger.compare_levels(level, min_level) != :lt do
+      # Mode is always async to avoid clogging the error_logger
+      GenEvent.notify(Logger,
+        {level, Process.group_leader(),
+          {ensure_pid(pid), {Logger, []}, format_event(level, kind, data, truncate)}})
+    end
 
     :ok
   end

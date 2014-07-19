@@ -21,11 +21,14 @@ defmodule Logger.Case do
     end
   end
 
-  def capture_log(fun) do
+  def capture_log(level \\ :debug, fun) do
+    Logger.configure(level: level)
     capture_io(:user, fn ->
       fun.()
       GenEvent.which_handlers(:error_logger)
       GenEvent.which_handlers(Logger)
     end)
+  after
+    Logger.configure(level: :debug)
   end
 end

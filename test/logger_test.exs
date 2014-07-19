@@ -2,28 +2,66 @@ defmodule LoggerTest do
   use Logger.Case
   require Logger
 
-  test "warn/2" do
-    assert capture_log(fn ->
-      assert Logger.warn("hello", []) == :ok
-    end) =~ msg("[warn] hello")
+  test "level/0" do
+    assert Logger.level == :debug
   end
 
-  test "error/2" do
-    assert capture_log(fn ->
-      assert Logger.error("hello", []) == :ok
-    end) =~ msg("[error] hello")
-  end
+  test "compare_levels/2" do
+    assert Logger.compare_levels(:debug, :debug) == :eq
+    assert Logger.compare_levels(:debug, :info)  == :lt
+    assert Logger.compare_levels(:debug, :warn)  == :lt
+    assert Logger.compare_levels(:debug, :error) == :lt
 
-  test "info/2" do
-    assert capture_log(fn ->
-      assert Logger.info("hello", []) == :ok
-    end) =~ msg("[info] hello")
+    assert Logger.compare_levels(:info, :debug) == :gt
+    assert Logger.compare_levels(:info, :info)  == :eq
+    assert Logger.compare_levels(:info, :warn)  == :lt
+    assert Logger.compare_levels(:info, :error) == :lt
+
+    assert Logger.compare_levels(:warn, :debug) == :gt
+    assert Logger.compare_levels(:warn, :info)  == :gt
+    assert Logger.compare_levels(:warn, :warn)  == :eq
+    assert Logger.compare_levels(:warn, :error) == :lt
+
+    assert Logger.compare_levels(:error, :debug) == :gt
+    assert Logger.compare_levels(:error, :info)  == :gt
+    assert Logger.compare_levels(:error, :warn)  == :gt
+    assert Logger.compare_levels(:error, :error) == :eq
   end
 
   test "debug/2" do
     assert capture_log(fn ->
       assert Logger.debug("hello", []) == :ok
     end) =~ msg("[debug] hello")
+
+    assert capture_log(:info, fn ->
+      assert Logger.debug("hello", []) == :ok
+    end) == ""
+  end
+
+  test "info/2" do
+    assert capture_log(fn ->
+      assert Logger.info("hello", []) == :ok
+    end) =~ msg("[info] hello")
+
+    assert capture_log(:warn, fn ->
+      assert Logger.info("hello", []) == :ok
+    end) == ""
+  end
+
+  test "warn/2" do
+    assert capture_log(fn ->
+      assert Logger.warn("hello", []) == :ok
+    end) =~ msg("[warn] hello")
+
+    assert capture_log(:error, fn ->
+      assert Logger.warn("hello", []) == :ok
+    end) == ""
+  end
+
+  test "error/2" do
+    assert capture_log(fn ->
+      assert Logger.error("hello", []) == :ok
+    end) =~ msg("[error] hello")
   end
 
   test "log/2 truncates messages" do

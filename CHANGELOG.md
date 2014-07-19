@@ -3,6 +3,7 @@
 * [Logger] Requires Elixir master
 * [Logger] Improve truncation algorithms to avoid overflow
 * [Logger] Alternate between sync and async modes
+* [Logger] Prune messages based on logger level
 
 # v0.2.0
 
