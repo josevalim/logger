@@ -22,14 +22,9 @@ defmodule Logger.Formatter do
     end
   end
 
-
+  defp compile_code(key) when is_atom(key) and key in @valid_patterns, do: key
+  defp compile_code(key) when is_atom(key), do: raise(ArgumentError, message: "$#{key} is an invalid format pattern.")
   defp compile_code(other) when is_binary(other), do: other
-  defp compile_code(key) when is_atom(key) do
-    unless Enum.member?(@valid_patterns, key) do
-      raise ArgumentError, message: "$#{key} is an invalid format pattern."
-    end
-    key
-  end
 
   def format({mod, fun}, level, ts, msg, md) do
     unless Enum.member?(mod.__info__(:functions), {fun, 4}) do
