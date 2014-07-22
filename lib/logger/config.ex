@@ -66,13 +66,14 @@ defmodule Logger.Config do
 
   defp compute_state(mode) do
     level    = Application.get_env(:logger, :level)
+    utc_log  = Application.get_env(:logger, :utc_log)
     truncate = Application.get_env(:logger, :truncate)
 
     sync_threshold  = Application.get_env(:logger, :sync_threshold)
     async_threshold = trunc(sync_threshold * 0.75)
 
     state =
-      %{level: level, mode: mode, truncate: truncate,
+      %{level: level, mode: mode, truncate: truncate, utc_log: utc_log,
         sync_threshold: sync_threshold, async_threshold: async_threshold}
     persist(state)
     state

@@ -4,6 +4,8 @@
 * [Logger] Improve truncation algorithms to avoid overflow
 * [Logger] Alternate between sync and async modes
 * [Logger] Prune messages based on logger level
+* [Logger] Provides custom formatting and API for customizing backends
+* [Logger] Allow users to choose in between utc or local time logging (defaults to local time)
 
 # v0.2.0
 

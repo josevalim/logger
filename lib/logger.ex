@@ -63,6 +63,9 @@ defmodule Logger do
       cause the message to be ignored. Keep in mind that each backend
       may have its specific level too.
 
+    * `:utc_log` - when true, uses UTC in logs. By default it uses
+      local time (i.e. it defaults to false).
+
     * `:truncate` - the maximum message size to be logged. Defaults
       to 8192 bytes. Note this configuration is approximate. Truncated
       messages will have " (truncated)" at the end.
@@ -273,10 +276,11 @@ defmodule Logger do
   @spec log(level, IO.chardata | (() -> IO.chardata), Keyword.t) :: :ok
   def log(level, chardata, metadata \\ []) when level in @levels and is_list(metadata) do
     check_logger!
-    %{mode: mode, truncate: truncate, level: min_level} = Logger.Config.__data__
+    %{mode: mode, truncate: truncate,
+      level: min_level, utc_log: utc_log?} = Logger.Config.__data__
 
     if compare_levels(level, min_level) != :lt do
-      tuple = {Logger, truncate(chardata, truncate), Logger.Utils.timestamp(),
+      tuple = {Logger, truncate(chardata, truncate), Logger.Utils.timestamp(utc_log?),
                [pid: self()] ++ metadata() ++ metadata}
       notify(mode, {level, Process.group_leader(), tuple})
     end

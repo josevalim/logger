@@ -15,6 +15,7 @@ defmodule Logger.Mixfile do
     [applications: [],
      mod: {Logger, []},
      env: [level: :debug,
+           utc_log: false,
            truncate: 8096,
            backends: [:console],
            sync_threshold: 20,

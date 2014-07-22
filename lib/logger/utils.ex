@@ -234,10 +234,13 @@ defmodule Logger.Utils do
   @doc """
   Returns a timestamp that includes miliseconds.
   """
-  def timestamp() do
-    # TODO: consider local vs universal time
+  def timestamp(utc_log?) do
     {_, _, micro} = now = :os.timestamp()
-    {date, {hours, minutes, seconds}} = :calendar.now_to_universal_time(now)
+    {date, {hours, minutes, seconds}} =
+      case utc_log? do
+        true  -> :calendar.now_to_universal_time(now)
+        false -> :calendar.now_to_local_time(now)
+      end
     {date, {hours, minutes, seconds, div(micro, 1000)}}
   end
 

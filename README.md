@@ -40,11 +40,11 @@ Short-term features (before 1.0):
   * *done* A way to lazily calculate the log messages to avoid generating expensive log messages that won't be used.
   * *done* An error handler that supports a threshold (as seen in Lager) to limit the amount of messages we print per second (so we never bring the node down due to excessive messages, see [cascading-failures](https://github.com/ferd/cascading-failures)).
   * *done* Switching between sync and async modes.
+  * *done* Custom formatting.
+  * *done* Metadata (via options and process dictionary).
   * Error translators, so we can translate GenServer and other OTP errors into something more palatable.
-  * Custom formatting.
   * Custom backends.
   * SASL reports.
-  * Metadata (via options and process dictionary).
 
 Long-term features (after 1.0):
 

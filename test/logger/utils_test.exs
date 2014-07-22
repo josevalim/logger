@@ -81,7 +81,7 @@ defmodule Logger.UtilsTest do
   end
 
   test "timestamp" do
-    assert {{_, _, _}, {_, _, _, _}} = timestamp()
+    assert {{_, _, _}, {_, _, _, _}} = timestamp(true)
   end
 
   test "format_date" do

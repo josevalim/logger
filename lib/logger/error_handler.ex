@@ -41,7 +41,7 @@ defmodule Logger.ErrorHandler do
     do: :ok
 
   defp log_event(level, kind, pid, data) do
-    %{level: min_level, truncate: truncate} = Logger.Config.__data__
+    %{level: min_level, truncate: truncate, utc_log: utc_log?} = Logger.Config.__data__
 
     if Logger.compare_levels(level, min_level) != :lt do
       message = format_event(level, kind, data, truncate)
@@ -49,7 +49,7 @@ defmodule Logger.ErrorHandler do
       # Mode is always async to avoid clogging the error_logger
       GenEvent.notify(Logger,
         {level, Process.group_leader(),
-          {Logger, message, Logger.Utils.timestamp(), [pid: ensure_pid(pid)]}})
+          {Logger, message, Logger.Utils.timestamp(utc_log?), [pid: ensure_pid(pid)]}})
     end
     :ok
   end
