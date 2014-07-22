@@ -2,6 +2,81 @@ import Kernel, except: [inspect: 2]
 
 defmodule Logger.Formatter do
   @moduledoc false
+  @valid_patterns [:time, :date, :message, :level, :node, :metadata]
+  @default_pattern "$time $metadata [$level] $message\n"
+
+  def compile(nil), do: compile(@default_pattern)
+  def compile({mod, fun}) when is_atom(mod) and is_atom(fun), do: {mod, fun}
+
+  @doc ~S"""
+
+    Compiles a format string into an array that the format\5 can handle.
+
+    The valid parameters you can use are
+
+    - $time 
+    - $date
+    - $message
+    - $level
+    - $node
+    - $metadata - metadata is presented in key=val key2=val2 format.
+
+    If you pass nil into compile it will use the default 
+    format of `$time $metadata [$level] $message`
+
+    If you would like to make your own custom formatter simply pass 
+    `{module, function}` to compile and the rest is handled. 
+
+      iex> Logger.Formatter.compile("$time $metadata [$level] $message\n")
+      [:time, " ", :metadata, " [", :level, "] ", :message, "\n"]
+  """
+  @spec compile(binary) :: list()
+  def compile(str) do
+    for code <- Regex.split(~r/(\$[a-z]+)/, str, trim: true) do
+      if String.starts_with?(code, "$") do
+        code = code |> String.slice(1..-1) |> String.to_atom
+      end
+      compile_code(code)
+    end
+  end
+
+  defp compile_code(key) when key in @valid_patterns, do: key
+  defp compile_code(key) when is_atom(key) do
+    raise(ArgumentError, message: "$#{key} is an invalid format pattern.")
+  end
+  defp compile_code(other) when is_binary(other), do: other
+
+  def format({mod, fun}, level, ts, msg, md) do
+    Module.function(mod, fun, 4).(level, ts, msg, md)
+  end
+
+  @doc"""
+    Takes a compiled format string, level, timestamp, message and 
+    metadata listdict and returns a properly formatted string.
+  """
+  def format(config, level, ts, msg, meta) do
+    for c <- config do
+      output(c, level, ts, msg, meta)
+    end
+  end
+
+  defp output(:message, _, _,  message, _), do: message
+  defp output(:date, _, {date, _time}, _, _) do 
+    Logger.Utility.format_date(date)
+  end
+
+  defp output(:time, _, {_date, time}, _, _) do
+    Logger.Utility.format_time(time)
+  end
+  defp output(:level, level, _, _, _), do: Atom.to_string(level)
+  defp output(:node, _, _, _, _),  do: Atom.to_string(node())
+  defp output(:metadata, _, _, _, []), do: ""
+  defp output(:metadata, _, _, _, meta) do
+    meta
+      |> Enum.map(fn {key, val} -> "#{to_string(key)}=#{to_string(val)}" end)
+      |> Enum.join(" ")
+  end 
+  defp output(other, _, _, _, _), do: other
 
   @doc """
   Truncates a char data into n bytes.

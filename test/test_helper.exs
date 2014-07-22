@@ -4,6 +4,10 @@ defmodule Logger.Case do
   use ExUnit.CaseTemplate
   import ExUnit.CaptureIO
 
+  setup do
+    Application.put_env(:logger, :tty, [formatter: "[$level] $message"])
+  end
+
   using _ do
     quote do
       import Logger.Case
@@ -11,7 +15,7 @@ defmodule Logger.Case do
   end
 
   def msg(msg) do
-    ~r/^\d\d\d\d\-\d\d\-\d\d \d\d:\d\d:\d\d #{Regex.escape(msg)}$/
+    ~r/^#{Regex.escape(msg)}$/
   end
 
   def wait_for_handler() do

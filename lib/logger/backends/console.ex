@@ -6,7 +6,12 @@ defmodule Logger.Backends.Console do
     if user = Process.whereis(:user) do
       Process.group_leader(self(), user)
     end
-    {:ok, %{}}
+
+    format = Application.get_env(:logger, :tty, [])
+      |> Dict.get(:formatter, nil)
+      |> Logger.Formatter.compile
+
+    {:ok, %{format: format}}
   end
 
   ## Handle event
@@ -15,23 +20,13 @@ defmodule Logger.Backends.Console do
     {:ok, state}
   end
 
-  def handle_event({level, _gl, {Logger, message, _timestamp, metadata}}, state) do
-    log_event(level, message, metadata, state)
+  def handle_event({level, _gl, {Logger, message, timestamp, metadata}}, state) do
+    log_event(level, timestamp, message, metadata, state)
     {:ok, state}
   end
 
   ## Helpers
-
-  # TODO: Support custom formatting (new line is a formatting concern)
-  defp log_event(type, message, _metadata, _state) do
-    time = :erlang.universaltime
-    :io.put_chars :user, [format_time(time), ?\s, ?[, Atom.to_string(type), ?], ?\s, message, ?\n]
+  defp log_event(level, ts, message, metadata, %{format: format}) do
+    :io.put_chars :user, Logger.Formatter.format(format, level, ts, message, metadata)
   end
-
-  defp format_time({{yy, mm, dd}, {hh, mi, ss}}) do
-    [pad(yy), ?-, pad(mm), ?-, pad(dd), ?\s, pad(hh), ?:, pad(mi), ?:, pad(ss)]
-  end
-
-  defp pad(int) when int < 10, do: [?0, Integer.to_string(int)]
-  defp pad(int), do: Integer.to_string(int)
 end

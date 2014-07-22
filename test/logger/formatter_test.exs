@@ -1,5 +1,6 @@
 defmodule Logger.FormatterTest do
   use Logger.Case, async: true
+  doctest Logger.Formatter
 
   import Kernel, except: [inspect: 2]
 
@@ -78,5 +79,47 @@ defmodule Logger.FormatterTest do
 
     assert inspect('~ts~ts~ts', ["abcdeabcde", "abcde", "abcde"]) ==
            {'~ts~ts~ts', ["abcdeabcde", "", ""]}
+  end
+
+
+  defp compile(format), do: Logger.Formatter.compile(format)
+  defp format(config, l, t, m, md), do: Logger.Formatter.format(config, l, t, m, md)
+  test "compile/1 with nil" do
+    assert compile(nil) == [:time, " ", :metadata, " [", :level, "] ", :message, "\n"]
+  end
+
+  test "compile/1 with str" do
+    assert compile("$level $time $date $metadata $message $node") == Enum.intersperse([:level, :time, :date, :metadata, :message, :node], " ")
+    assert_raise ArgumentError,"$bad is an invalid format pattern.", fn ->
+      compile("$bad $good")
+    end
+  end
+
+  defmodule CompileMod do
+    def format(level, ts, msg, md) do
+      true
+    end
+  end
+  test "compile/1 with {mod, fun}" do
+    assert compile({CompileMod, :format}) == {CompileMod, :format}
+  end
+
+  test "format with {mod, fun}" do
+    assert format({CompileMod, :format}, nil, nil, nil,nil) == true
+  end
+
+  test "format with format string" do
+    compiled = compile("[$level] $message")
+    assert format(compiled, :error, nil, "hello", []) == ["[", "error", "] ", "hello"]
+
+    compiled = compile("$metadata")
+    assert format(compiled, :error, nil, nil, [meta: :data]) == ["meta=:data"]
+
+    compiled = compile("$node")
+    assert format(compiled, :error, nil, nil, []) == [Atom.to_string(node())]
+
+    {{yy, mm, dd}, {hh, mi, ss, ms}} = timestamp = {{2014, 12, 30}, {12, 6, 30, 100}}
+    compiled = compile("$date $time")
+    assert format(compiled, :error, timestamp, nil, []) == [["2014", ?-, "12", ?-, "30"], " ",["12", ?:, [?0, "6"], ?:, "30", ?., "100"]]
   end
 end
