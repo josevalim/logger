@@ -20,7 +20,8 @@ defmodule Logger.Mixfile do
            sync_threshold: 20,
            handle_otp_reports: true,
            handle_sasl_reports: true,
-           discard_threshold_for_error_logger: 500]]
+           discard_threshold_for_error_logger: 500,
+           console: []]]
   end
 
   # Dependencies can be hex.pm packages:

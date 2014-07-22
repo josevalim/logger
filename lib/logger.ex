@@ -1,7 +1,7 @@
 defmodule Logger do
   use Application
 
-  @moduledoc """
+  @moduledoc ~S"""
   A logger for Elixir applications.
 
   It includes many features:
@@ -114,7 +114,27 @@ defmodule Logger do
 
   ### Console backend
 
-  TODO
+  The console backend logs message to the console. It supports the
+  following options:
+
+    * `:level` - the level to be logged by this backend.
+      Note though messages are first filtered by the general
+      `:level` configuration in `:logger`
+
+    * `:format` - the format message used to print logs.
+      Defaults to: "$time $metadata[$level] $message\n"
+
+    * `:metadata` - the metadata to be printed by `$metadata`.
+      Defaults to an empty list (no metadata)
+
+  Here is an example on how to configure the `:console` in a
+  `config/config.exs` file:
+
+      config :logger, :console,
+        format: "$date $time [$level] $metadata$message\n",
+        metadata: [:user_id]
+
+  You can read more about formatting in `Logger.Formatter`.
 
   ### Custom backends
 
@@ -174,6 +194,22 @@ defmodule Logger do
       :error_logger.delete_report_handler(handler) != {:error, :module_not_found}
   end
 
+  @metadata :logger_metadata
+
+  @doc """
+  Adds the given keyword list to the current process metadata.
+  """
+  def metadata(dict) do
+    Process.put(@metadata, dict ++ metadata)
+  end
+
+  @doc """
+  Reads the current process metadata.
+  """
+  def metadata() do
+    Process.get(@metadata) || []
+  end
+
   @doc """
   Retrieves the logger level.
 
@@ -214,6 +250,17 @@ defmodule Logger do
   end
 
   @doc """
+  Configures the given backend.
+  """
+  def configure_backend(backend, options) do
+    GenEvent.call(Logger, translate_backend(backend), {:configure, options})
+    :ok
+  end
+
+  defp translate_backend(:console), do: Logger.Backends.Console
+  defp translate_backend(other),    do: other
+
+  @doc """
   Logs a message.
 
   Developers should rather use the macros `Logger.debug/2`,
@@ -229,7 +276,8 @@ defmodule Logger do
     %{mode: mode, truncate: truncate, level: min_level} = Logger.Config.__data__
 
     if compare_levels(level, min_level) != :lt do
-      tuple = {Logger, truncate(chardata, truncate), Logger.Utility.timestamp(), [pid: self()] ++ metadata}
+      tuple = {Logger, truncate(chardata, truncate), Logger.Utils.timestamp(),
+               [pid: self()] ++ metadata() ++ metadata}
       notify(mode, {level, Process.group_leader(), tuple})
     end
 
@@ -305,9 +353,9 @@ defmodule Logger do
   end
 
   defp truncate(data, n) when is_function(data, 0),
-    do: Logger.Formatter.truncate(data.(), n)
+    do: Logger.Utils.truncate(data.(), n)
   defp truncate(data, n) when is_list(data) or is_binary(data),
-    do: Logger.Formatter.truncate(data, n)
+    do: Logger.Utils.truncate(data, n)
 
   defp notify(:sync, msg),  do: GenEvent.sync_notify(Logger, msg)
   defp notify(:async, msg), do: GenEvent.notify(Logger, msg)

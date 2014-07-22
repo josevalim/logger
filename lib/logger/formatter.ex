@@ -1,36 +1,73 @@
 import Kernel, except: [inspect: 2]
 
 defmodule Logger.Formatter do
-  @moduledoc false
+  @moduledoc ~S"""
+  Conveniences for formatting data for logs.
+
+  This module allows developers to specify a string that
+  serves as template for log messages, for example:
+
+      $time $metadata[$level] $message\n
+
+  Will print error messages as:
+
+      18:43:12.439 user_id=13 [error] Hello\n
+
+  The valid parameters you can use are:
+
+    * `$time` - time the log message was sent
+    * `$date` - date the log message was sent
+    * `$message` - the log message
+    * `$level` - the log level
+    * `$node` - the node that prints the message
+    * `$metadata` - user controled data presented in "key=val key2=val2" format
+
+  Backends typically allow developers to supply such control
+  strings via configuration files. This module provides `compile/1`,
+  which compiles the string into a format for fast operations at
+  runtime and `format/5` to format the compiled pattern into an
+  actual IO data.
+
+  ## Metadata
+
+  Metadata to be sent to the Logger can be read and written with
+  the `Logger.metadata/0` and `Logger.metadata/1` functions. For example,
+  you can set `Logger.metadata([user_id: 13])` to add user_id metadata
+  to the current process. The user can configure the backend to chose
+  which metadata it wants to print and it will replace the $metadata
+  value.
+  """
+
   @valid_patterns [:time, :date, :message, :level, :node, :metadata]
-  @default_pattern "$time $metadata [$level] $message\n"
+  @default_pattern "$time $metadata[$level] $message\n"
+
+  @doc ~S"""
+  Compiles a format string into an array that the `format/5` can handle.
+
+  The valid parameters you can use are:
+
+  * $time
+  * $date
+  * $message
+  * $level
+  * $node
+  * $metadata - metadata is presented in key=val key2=val2 format.
+
+  If you pass nil into compile it will use the default
+  format of `$time $metadata [$level] $message`
+
+  If you would like to make your own custom formatter simply pass
+  `{module, function}` to compile and the rest is handled.
+
+    iex> Logger.Formatter.compile("$time $metadata [$level] $message\n")
+    [:time, " ", :metadata, " [", :level, "] ", :message, "\n"]
+  """
+  @spec compile(binary | nil) :: list()
+  @spec compile({atom, atom}) :: {atom, atom}
 
   def compile(nil), do: compile(@default_pattern)
   def compile({mod, fun}) when is_atom(mod) and is_atom(fun), do: {mod, fun}
 
-  @doc ~S"""
-
-    Compiles a format string into an array that the format\5 can handle.
-
-    The valid parameters you can use are
-
-    - $time 
-    - $date
-    - $message
-    - $level
-    - $node
-    - $metadata - metadata is presented in key=val key2=val2 format.
-
-    If you pass nil into compile it will use the default 
-    format of `$time $metadata [$level] $message`
-
-    If you would like to make your own custom formatter simply pass 
-    `{module, function}` to compile and the rest is handled. 
-
-      iex> Logger.Formatter.compile("$time $metadata [$level] $message\n")
-      [:time, " ", :metadata, " [", :level, "] ", :message, "\n"]
-  """
-  @spec compile(binary) :: list()
   def compile(str) do
     for code <- Regex.split(~r/(\$[a-z]+)/, str, trim: true) do
       if String.starts_with?(code, "$") do
@@ -46,265 +83,31 @@ defmodule Logger.Formatter do
   end
   defp compile_code(other) when is_binary(other), do: other
 
-  def format({mod, fun}, level, ts, msg, md) do
-    Module.function(mod, fun, 4).(level, ts, msg, md)
+  @doc """
+  Takes a compiled format and injects the, level, timestamp, message and
+  metadata listdict and returns a properly formatted string.
+  """
+
+  def format({mod, fun}, level, msg, ts, md) do
+    Module.function(mod, fun, 4).(level, msg, ts, md)
   end
 
-  @doc"""
-    Takes a compiled format string, level, timestamp, message and 
-    metadata listdict and returns a properly formatted string.
-  """
-  def format(config, level, ts, msg, meta) do
+  def format(config, level, msg, ts, md) do
     for c <- config do
-      output(c, level, ts, msg, meta)
+      output(c, level, msg, ts, md)
     end
   end
 
-  defp output(:message, _, _,  message, _), do: message
-  defp output(:date, _, {date, _time}, _, _) do 
-    Logger.Utility.format_date(date)
-  end
-
-  defp output(:time, _, {_date, time}, _, _) do
-    Logger.Utility.format_time(time)
-  end
-  defp output(:level, level, _, _, _), do: Atom.to_string(level)
-  defp output(:node, _, _, _, _),  do: Atom.to_string(node())
-  defp output(:metadata, _, _, _, []), do: ""
+  defp output(:message, _, msg, _, _),        do: msg
+  defp output(:date, _, _, {date, _time}, _), do: Logger.Utils.format_date(date)
+  defp output(:time, _, _, {_date, time}, _), do: Logger.Utils.format_time(time)
+  defp output(:level, level, _, _, _),        do: Atom.to_string(level)
+  defp output(:node, _, _, _, _),             do: Atom.to_string(node())
+  defp output(:metadata, _, _, _, []),        do: ""
   defp output(:metadata, _, _, _, meta) do
-    meta
-      |> Enum.map(fn {key, val} -> "#{to_string(key)}=#{to_string(val)}" end)
-      |> Enum.join(" ")
-  end 
-  defp output(other, _, _, _, _), do: other
-
-  @doc """
-  Truncates a char data into n bytes.
-
-  There is a chance we truncate in the middle of a grapheme
-  cluster but we never truncate in the middle of a binary
-  codepoint. For this reason, truncation is not exact.
-  """
-  @spec truncate(IO.chardata, non_neg_integer) :: IO.chardata
-  def truncate(chardata, n) when n >= 0 do
-    {chardata, n} = truncate_n(chardata, n)
-    if n >= 0, do: chardata, else: [chardata, " (truncated)"]
-  end
-
-  defp truncate_n(_, n) when n < 0 do
-    {"", n}
-  end
-
-  defp truncate_n(binary, n) when is_binary(binary) do
-    remaining = n - byte_size(binary)
-    if remaining < 0 do
-      # There is a chance we are cutting at the wrong
-      # place so we need to fix the binary.
-      {fix_binary(binary_part(binary, 0, n)), remaining}
-    else
-      {binary, remaining}
-    end
-  end
-
-  defp truncate_n(int, n) when int in 0..127,                      do: {int, n-1}
-  defp truncate_n(int, n) when int in 127..0x07FF,                 do: {int, n-2}
-  defp truncate_n(int, n) when int in 0x800..0xFFFF,               do: {int, n-3}
-  defp truncate_n(int, n) when int >= 0x10000 and is_integer(int), do: {int, n-4}
-
-  defp truncate_n(list, n) when is_list(list) do
-    truncate_n_list(list, n, [])
-  end
-
-  defp truncate_n_list(_, n, acc) when n < 0 do
-    {:lists.reverse(acc), n}
-  end
-
-  defp truncate_n_list([h|t], n, acc) do
-    {h, n} = truncate_n(h, n)
-    truncate_n_list(t, n, [h|acc])
-  end
-
-  defp truncate_n_list([], n, acc) do
-    {:lists.reverse(acc), n}
-  end
-
-  defp truncate_n_list(t, n, acc) do
-    {t, n} = truncate_n(t, n)
-    {:lists.reverse(acc, t), n}
-  end
-
-  defp fix_binary(binary) do
-    # Use a thirteen-bytes offset to look back in the binary.
-    # This should allow at least two codepoints of 6 bytes.
-    suffix_size = min(byte_size(binary), 13)
-    prefix_size = byte_size(binary) - suffix_size
-    <<prefix :: binary-size(prefix_size), suffix :: binary-size(suffix_size)>> = binary
-    prefix <> fix_binary(suffix, "")
-  end
-
-  defp fix_binary(<<h::utf8, t::binary>>, acc) do
-    acc <> <<h::utf8>> <> fix_binary(t, "")
-  end
-
-  defp fix_binary(<<h, t::binary>>, acc) do
-    fix_binary(t, <<h, acc::binary>>)
-  end
-
-  defp fix_binary(<<>>, _acc) do
-    <<>>
-  end
-
-  @doc """
-  Receives a format string and arguments and replace `~p`,
-  `~P`, `~w` and `~W` by its inspected variants.
-  """
-  def inspect(format, args, truncate, opts \\ %Inspect.Opts{})
-
-  def inspect(format, args, truncate, opts) when is_atom(format) do
-    do_inspect(Atom.to_char_list(format), args, truncate, opts)
-  end
-
-  def inspect(format, args, truncate, opts) when is_binary(format) do
-    do_inspect(:binary.bin_to_list(format), args, truncate, opts)
-  end
-
-  def inspect(format, args, truncate, opts) when is_list(format) do
-    do_inspect(format, args, truncate, opts)
-  end
-
-  defp do_inspect(format, [], _truncate, _opts), do: {format, []}
-  defp do_inspect(format, args, truncate, opts) do
-    # A pre-pass that removes binaries from
-    # arguments according to the truncate limit.
-    {args, _} = Enum.map_reduce(args, truncate, fn arg, acc ->
-      if is_binary(arg) do
-        truncate_n(arg, acc)
-      else
-        {arg, acc}
-      end
+    Enum.map(meta, fn {key, val} ->
+      [to_string(key), ?=, to_string(val), ?\s]
     end)
-    do_inspect(format, args, [], [], opts)
   end
-
-  defp do_inspect([?~|t], args, used_format, used_args, opts) do
-    {t, args, cc_format, cc_args} = collect_cc(:width, t, args, [?~], [], opts)
-    do_inspect(t, args, cc_format ++ used_format, cc_args ++ used_args, opts)
-  end
-
-  defp do_inspect([h|t], args, used_format, used_args, opts),
-    do: do_inspect(t, args, [h|used_format], used_args, opts)
-
-  defp do_inspect([], [], used_format, used_args, _opts),
-    do: {:lists.reverse(used_format), :lists.reverse(used_args)}
-
-  ## width
-
-  defp collect_cc(:width, [?-|t], args, used_format, used_args, opts),
-    do: collect_value(:width, t, args, [?-|used_format], used_args, opts, :precision)
-
-  defp collect_cc(:width, t, args, used_format, used_args, opts),
-    do: collect_value(:width, t, args, used_format, used_args, opts, :precision)
-
-  ## precision
-
-  defp collect_cc(:precision, [?.|t], args, used_format, used_args, opts),
-    do: collect_value(:precision, t, args, [?.|used_format], used_args, opts, :pad_char)
-
-  defp collect_cc(:precision, t, args, used_format, used_args, opts),
-    do: collect_cc(:pad_char, t, args, used_format, used_args, opts)
-
-  ## pad char
-
-  defp collect_cc(:pad_char, [?.,?*|t], [arg|args], used_format, used_args, opts),
-    do: collect_cc(:encoding, t, args, [?*,?.|used_format], [arg|used_args], opts)
-
-  defp collect_cc(:pad_char, [?.,p|t], args, used_format, used_args, opts),
-    do: collect_cc(:encoding, t, args, [p,?.|used_format], used_args, opts)
-
-  defp collect_cc(:pad_char, t, args, used_format, used_args, opts),
-    do: collect_cc(:encoding, t, args, used_format, used_args, opts)
-
-  ## encoding
-
-  defp collect_cc(:encoding, [?l|t], args, used_format, used_args, opts),
-    do: collect_cc(:done, t, args, [?l|used_format], used_args, %{opts | char_lists: false})
-
-  defp collect_cc(:encoding, [?t|t], args, used_format, used_args, opts),
-    do: collect_cc(:done, t, args, [?t|used_format], used_args, opts)
-
-  defp collect_cc(:encoding, t, args, used_format, used_args, opts),
-    do: collect_cc(:done, t, args, used_format, used_args, opts)
-
-  ## done
-
-  defp collect_cc(:done, [?W|t], [data, limit|args], _used_format, _used_args, opts),
-    do: collect_inspect(t, args, data, %{opts | limit: limit, width: :infinity})
-
-  defp collect_cc(:done, [?w|t], [data|args], _used_format, _used_args, opts),
-    do: collect_inspect(t, args, data, %{opts | width: :infinity})
-
-  defp collect_cc(:done, [?P|t], [data, limit|args], _used_format, _used_args, opts),
-    do: collect_inspect(t, args, data, %{opts | limit: limit})
-
-  defp collect_cc(:done, [?p|t], [data|args], _used_format, _used_args, opts),
-    do: collect_inspect(t, args, data, opts)
-
-  defp collect_cc(:done, [h|t], args, used_format, used_args, _opts) do
-    {args, used_args} = collect_cc(h, args, used_args)
-    {t, args, [h|used_format], used_args}
-  end
-
-  defp collect_cc(?x, [a,prefix|args], used), do: {args, [prefix, a|used]}
-  defp collect_cc(?X, [a,prefix|args], used), do: {args, [prefix, a|used]}
-  defp collect_cc(?s, [a|args], used), do: {args, [a|used]}
-  defp collect_cc(?e, [a|args], used), do: {args, [a|used]}
-  defp collect_cc(?f, [a|args], used), do: {args, [a|used]}
-  defp collect_cc(?g, [a|args], used), do: {args, [a|used]}
-  defp collect_cc(?b, [a|args], used), do: {args, [a|used]}
-  defp collect_cc(?B, [a|args], used), do: {args, [a|used]}
-  defp collect_cc(?+, [a|args], used), do: {args, [a|used]}
-  defp collect_cc(?#, [a|args], used), do: {args, [a|used]}
-  defp collect_cc(?c, [a|args], used), do: {args, [a|used]}
-  defp collect_cc(?i, [a|args], used), do: {args, [a|used]}
-  defp collect_cc(?~, args, used), do: {args, used}
-  defp collect_cc(?n, args, used), do: {args, used}
-
-  defp collect_inspect(t, args, data, opts) do
-    data =
-      data
-      |> Inspect.Algebra.to_doc(opts)
-      |> Inspect.Algebra.format(opts.width)
-    {t, args, 'st~', [data]}
-  end
-
-  defp collect_value(current, [?*|t], [arg|args], used_format, used_args, opts, next)
-      when is_integer(arg) do
-    collect_cc(next, t, args, [?*|used_format], [arg|used_args],
-               put_value(opts, current, arg))
-  end
-
-  defp collect_value(current, [c|t], args, used_format, used_args, opts, next)
-      when is_integer(c) and c >= ?0 and c <= ?9 do
-    {t, c} = collect_value([c|t], [])
-    collect_cc(next, t, args, c ++ used_format, used_args,
-               put_value(opts, current, c |> :lists.reverse |> List.to_integer))
-  end
-
-  defp collect_value(_current, t, args, used_format, used_args, opts, next),
-    do: collect_cc(next, t, args, used_format, used_args, opts)
-
-  defp collect_value([c|t], buffer)
-    when is_integer(c) and c >= ?0 and c <= ?9,
-    do: collect_value(t, [c|buffer])
-
-  defp collect_value(other, buffer),
-    do: {other, buffer}
-
-  defp put_value(opts, key, value) do
-    if Map.has_key?(opts, key) do
-      Map.put(opts, key, value)
-    else
-      opts
-    end
-  end
+  defp output(other, _, _, _, _), do: other
 end

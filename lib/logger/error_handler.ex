@@ -49,7 +49,7 @@ defmodule Logger.ErrorHandler do
       # Mode is always async to avoid clogging the error_logger
       GenEvent.notify(Logger,
         {level, Process.group_leader(),
-          {Logger, message, Logger.Utility.timestamp(), [pid: ensure_pid(pid)]}})
+          {Logger, message, Logger.Utils.timestamp(), [pid: ensure_pid(pid)]}})
     end
     :ok
   end
@@ -96,11 +96,11 @@ defmodule Logger.ErrorHandler do
   end
 
   defp format_event(_level, :report, format, truncate) do
-    Logger.Formatter.truncate(Kernel.inspect(format), truncate)
+    Logger.Utils.truncate(Kernel.inspect(format), truncate)
   end
 
   defp format_event(_level, :format, {format, args}, truncate) do
-    {format, args} = Logger.Formatter.inspect(format, args, truncate)
-    Logger.Formatter.truncate(:io_lib.format(format, args), truncate)
+    {format, args} = Logger.Utils.inspect(format, args, truncate)
+    Logger.Utils.truncate(:io_lib.format(format, args), truncate)
   end
 end
