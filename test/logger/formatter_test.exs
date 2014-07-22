@@ -106,15 +106,20 @@ defmodule Logger.FormatterTest do
 
   test "format with {mod, fun}" do
     assert format({CompileMod, :format}, nil, nil, nil,nil) == true
-    assert_raise ArgumentError,"#{CompileMod} needs to define blah\4, ex: format(level, ts, msg, meta)", fn ->
-      format({CompileMod, :blah}, nil, nil, nil, nil)
-    end
   end
 
   test "format with format string" do
     compiled = compile("[$level] $message")
-    assert format(compiled, :error, nil, "hello", []) == ["[", 'error', "] ", "hello"]
+    assert format(compiled, :error, nil, "hello", []) == ["[", "error", "] ", "hello"]
+
     compiled = compile("$metadata")
     assert format(compiled, :error, nil, nil, [meta: :data]) == ["meta=:data"]
+
+    compiled = compile("$node")
+    assert format(compiled, :error, nil, nil, []) == [Atom.to_string(node())]
+
+    {{yy, mm, dd}, {hh, mi, ss, ms}} = timestamp = {{2014, 12, 30}, {12, 6, 30, 100}}
+    compiled = compile("$date $time")
+    assert format(compiled, :error, timestamp, nil, []) == [["2014", ?-, "12", ?-, "30"], " ",["12", ?:, [?0, "6"], ?:, "30", ?., "100"]]
   end
 end

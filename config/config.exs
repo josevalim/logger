@@ -20,15 +20,6 @@ use Mix.Config
 # here (which is why it is important to import them last).
 #
 
-config :logger,
-     level: :debug,
-     truncate: 8096,
-     backends: [:console],
-     sync_threshold: 20,
-     handle_otp_reports: true,
-     handle_sasl_reports: true,
-     discard_threshold_for_error_logger: 500
-
 if Mix.env == :test do
   import_config "test.exs" 
 end

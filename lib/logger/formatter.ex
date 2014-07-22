@@ -6,9 +6,27 @@ defmodule Logger.Formatter do
   @default_pattern "$time $metadata [$level] $message\n"
 
   def compile(nil), do: compile(@default_pattern)
-
   def compile({mod, fun}) when is_atom(mod) and is_atom(fun), do: {mod, fun}
+
   @doc ~S"""
+
+    Compiles a format string into an array that the format\5 can handle.
+
+    The valid parameters you can use are
+
+    - $time 
+    - $date
+    - $message
+    - $level
+    - $node
+    - $metadata - metadata is presented in key=val key2=val2 format.
+
+    If you pass nil into compile it will use the default 
+    format of `$time $metadata [$level] $message`
+
+    If you would like to make your own custom formatter simply pass 
+    `{module, function}` to compile and the rest is handled. 
+
       iex> Logger.Formatter.compile("$time $metadata [$level] $message\n")
       [:time, " ", :metadata, " [", :level, "] ", :message, "\n"]
   """
@@ -22,17 +40,20 @@ defmodule Logger.Formatter do
     end
   end
 
-  defp compile_code(key) when is_atom(key) and key in @valid_patterns, do: key
-  defp compile_code(key) when is_atom(key), do: raise(ArgumentError, message: "$#{key} is an invalid format pattern.")
+  defp compile_code(key) when key in @valid_patterns, do: key
+  defp compile_code(key) when is_atom(key) do
+    raise(ArgumentError, message: "$#{key} is an invalid format pattern.")
+  end
   defp compile_code(other) when is_binary(other), do: other
 
   def format({mod, fun}, level, ts, msg, md) do
-    unless Enum.member?(mod.__info__(:functions), {fun, 4}) do
-      raise ArgumentError, message: "#{mod} needs to define #{fun}\4, ex: format(level, ts, msg, meta)"
-    end
     Module.function(mod, fun, 4).(level, ts, msg, md)
   end
 
+  @doc"""
+    Takes a compiled format string, level, timestamp, message and 
+    metadata listdict and returns a properly formatted string.
+  """
   def format(config, level, ts, msg, meta) do
     for c <- config do
       output(c, level, ts, msg, meta)
@@ -40,20 +61,19 @@ defmodule Logger.Formatter do
   end
 
   defp output(:message, _, _,  message, _), do: message
-  defp output(:date, _, ts, _, _) do 
-    {date, _} = Logger.Utility.format_time(ts)
-    date
+  defp output(:date, _, {date, _time}, _, _) do 
+    Logger.Utility.format_date(date)
   end
 
-  defp output(:time, _, ts, _, _) do
-    {_, time} = Logger.Utility.format_time(ts)
-    time
+  defp output(:time, _, {_date, time}, _, _) do
+    Logger.Utility.format_time(time)
   end
-  defp output(:level, level, _, _, _), do: Atom.to_char_list(level)
-  defp output(:node, _, _, _, _),  do: Kernel.inspect(node())
+  defp output(:level, level, _, _, _), do: Atom.to_string(level)
+  defp output(:node, _, _, _, _),  do: Atom.to_string(node())
+  defp output(:metadata, _, _, _, []), do: ""
   defp output(:metadata, _, _, _, meta) do
-    meta 
-      |> Enum.map(fn {key, val} -> "#{key}=#{Kernel.inspect(val)}" end)
+    meta
+      |> Enum.map(fn {key, val} -> "#{to_string(key)}=#{to_string(val)}" end)
       |> Enum.join(" ")
   end 
   defp output(other, _, _, _, _), do: other
