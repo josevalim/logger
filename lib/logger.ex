@@ -87,11 +87,6 @@ defmodule Logger do
       they are formatted in Elixir terms. This uninstalls Erlang's
       logger that prints terms to terminal.
 
-    * `:handle_sasl_reports` - redirects SASL reports to Logger so
-      they are formatted in Elixir terms. This uninstalls SASL's
-      logger that prints terms to terminal as long as the SASL
-      application is started before Logger.
-
     * `:discard_threshold_for_error_logger` - a value that, when
       reached, triggers the error logger to discard messages. This
       value must be a positive number that represents the maximum
@@ -164,21 +159,18 @@ defmodule Logger do
     Logger.Watcher.watch(Logger, Logger.Backends.Console, :ok)
 
     otp_reports?   = Application.get_env(:logger, :handle_otp_reports)
-    sasl_reports?  = Application.get_env(:logger, :handle_sasl_reports)
     reenable_tty?  = delete_error_logger_handler(otp_reports?, :error_logger_tty_h)
-    reenable_sasl? = delete_error_logger_handler(sasl_reports?, :sasl_report_tty_h)
 
     threshold = Application.get_env(:logger, :discard_threshold_for_error_logger)
     Logger.Watcher.watch(:error_logger, Logger.ErrorHandler,
-      {otp_reports?, sasl_reports?, threshold})
+      {otp_reports?, threshold})
 
-    {:ok, sup, {reenable_tty?, reenable_sasl?}}
+    {:ok, sup, reenable_tty?}
   end
 
   @doc false
-  def stop({reenable_tty?, reenable_sasl?}) do
+  def stop(reenable_tty?) do
     add_error_logger_handler(reenable_tty?, :error_logger_tty_h)
-    add_error_logger_handler(reenable_sasl?, :sasl_report_tty_h)
 
     # We need to do this in another process as the Application
     # Controller is currently blocked shutting down this app.

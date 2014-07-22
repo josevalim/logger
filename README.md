@@ -44,10 +44,10 @@ Short-term features (before 1.0):
   * *done* Metadata (via options and process dictionary).
   * Error translators, so we can translate GenServer and other OTP errors into something more palatable.
   * Custom backends.
-  * SASL reports.
 
 Long-term features (after 1.0):
 
+  * SASL reports.
   * Logging to files and log rotation.
   * Tracing.
 

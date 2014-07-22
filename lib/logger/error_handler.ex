@@ -3,8 +3,8 @@ defmodule Logger.ErrorHandler do
 
   require Logger
 
-  def init({otp?, sasl?, threshold}) do
-    {:ok, %{otp: otp?, sasl: sasl?, threshold: threshold,
+  def init({otp?, threshold}) do
+    {:ok, %{otp: otp?, threshold: threshold,
             last_length: 0, last_time: :os.timestamp, dropped: 0}}
   end
 

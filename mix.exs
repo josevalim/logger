@@ -20,7 +20,6 @@ defmodule Logger.Mixfile do
            backends: [:console],
            sync_threshold: 20,
            handle_otp_reports: true,
-           handle_sasl_reports: true,
            discard_threshold_for_error_logger: 500,
            console: []]]
   end
