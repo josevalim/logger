@@ -4,7 +4,7 @@ defmodule Logger.Backends.ConsoleTest do
 
   setup do
     on_exit fn ->
-      Logger.configure_backend(:console, [format: nil, level: nil, metadata: []])
+      :ok = Logger.configure_backend(:console, [format: nil, level: nil, metadata: []])
     end
   end
 

@@ -140,6 +140,7 @@ defmodule Logger do
 
   """
 
+  @type backend :: GenEvent.handler
   @type level :: :error | :info | :warn | :debug
   @levels [:error, :info, :warn, :debug]
 
@@ -247,9 +248,9 @@ defmodule Logger do
   @doc """
   Configures the given backend.
   """
-  def configure_backend(backend, options) do
+  @spec configure_backend(backend, Keywowrd.t) :: term
+  def configure_backend(backend, options) when is_list(options) do
     GenEvent.call(Logger, translate_backend(backend), {:configure, options})
-    :ok
   end
 
   defp translate_backend(:console), do: Logger.Backends.Console
