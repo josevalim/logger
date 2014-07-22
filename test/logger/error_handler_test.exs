@@ -3,7 +3,15 @@ defmodule Logger.ErrorHandlerTest do
 
   test "survives after crashes" do
     assert error_log(:info_msg, "~p~n", []) == ""
-    wait_for_handler()
+    wait_for_handler(:error_logger, Logger.ErrorHandler)
+    assert error_log(:info_msg, "~p~n", [:hello]) =~ msg("[info] :hello\n")
+  end
+
+  test "survives after Logger exit" do
+    Process.whereis(Logger)
+      |> Process.exit(:kill)
+    wait_for_logger()
+    wait_for_handler(:error_logger, Logger.ErrorHandler)
     assert error_log(:info_msg, "~p~n", [:hello]) =~ msg("[info] :hello\n")
   end
 

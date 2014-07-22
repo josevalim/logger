@@ -14,10 +14,23 @@ defmodule Logger.Case do
     ~r/^\d\d\:\d\d\:\d\d\.\d\d\d #{Regex.escape(msg)}$/
   end
 
-  def wait_for_handler() do
-    unless Logger.ErrorHandler in GenEvent.which_handlers(:error_logger) do
+  def wait_for_handler(manager, handler) do
+    unless handler in GenEvent.which_handlers(manager) do
       :timer.sleep(10)
-      wait_for_handler()
+      wait_for_handler(manager, handler)
+    end
+  end
+
+  def wait_for_logger() do
+    try do
+      GenEvent.which_handlers(Logger)
+    else
+      _ ->
+        :ok
+    catch
+      :exit, _ ->
+        :timer.sleep(10)
+        wait_for_logger()
     end
   end
 

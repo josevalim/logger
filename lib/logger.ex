@@ -147,25 +147,30 @@ defmodule Logger do
   def start(_type, _args) do
     import Supervisor.Spec
 
-    options  = [strategy: :one_for_one, name: Logger.Supervisor]
-    children = [worker(GenEvent, [[name: Logger]]),
-                supervisor(Logger.Watcher, [])]
-
-    {:ok, sup} = Supervisor.start_link(children, options)
+    otp_reports? = Application.get_env(:logger, :handle_otp_reports)
+    threshold = Application.get_env(:logger, :discard_threshold_for_error_logger)
 
     # TODO: Start this based on the backends config
     # TODO: Runtime backend configuration
-    Logger.Watcher.watch(Logger, Logger.Config, :ok)
-    Logger.Watcher.watch(Logger, Logger.Backends.Console, :ok)
+    backends = [{Logger, Logger.Backends.Console, :ok}]
+    options  = [strategy: :rest_for_one, name: Logger.Supervisor]
+    children = [worker(GenEvent, [[name: Logger]]),
+                worker(Logger.Watcher, [Logger, Logger.Config, :ok],
+                  [id: Logger.Config, function: :watcher]),
+                supervisor(Logger.Watcher, []),
+                worker(Task, [Logger.Watcher, :watch, [backends]],
+                  [restart: :transient]),
+                worker(Logger.Watcher,
+                  [:error_logger, Logger.ErrorHandler, {otp_reports?, threshold}],
+                  [id: Logger.ErrorHandler, function: :watcher])]
 
-    otp_reports?   = Application.get_env(:logger, :handle_otp_reports)
-    reenable_tty?  = delete_error_logger_handler(otp_reports?, :error_logger_tty_h)
-
-    threshold = Application.get_env(:logger, :discard_threshold_for_error_logger)
-    Logger.Watcher.watch(:error_logger, Logger.ErrorHandler,
-      {otp_reports?, threshold})
-
-    {:ok, sup, reenable_tty?}
+    case Supervisor.start_link(children, options) do
+      {:ok, sup} ->
+        reenable_tty? = delete_error_logger_handler(otp_reports?, :error_logger_tty_h)
+        {:ok, sup, reenable_tty?}
+      {:error, _reason} = error ->
+        error
+    end
   end
 
   @doc false
