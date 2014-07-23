@@ -149,16 +149,18 @@ defmodule Logger do
     import Supervisor.Spec
 
     otp_reports? = Application.get_env(:logger, :handle_otp_reports)
-    threshold = Application.get_env(:logger, :discard_threshold_for_error_logger)
+    threshold    = Application.get_env(:logger, :discard_threshold_for_error_logger)
 
-    # TODO: Start this based on the backends config
-    # TODO: Runtime backend configuration
-    backends = [{Logger, Logger.Backends.Console, []}]
+    handlers =
+      for backend <- Application.get_env(:logger, :backends) do
+        {Logger, translate_backend(backend), []}
+      end
+
     options  = [strategy: :rest_for_one, name: Logger.Supervisor]
     children = [worker(GenEvent, [[name: Logger]]),
                 worker(Logger.Watcher, [Logger, Logger.Config, []],
                   [id: Logger.Config, function: :watcher]),
-                supervisor(Logger.Watcher, [backends]),
+                supervisor(Logger.Watcher, [handlers]),
                 worker(Logger.Watcher,
                   [:error_logger, Logger.ErrorHandler, {otp_reports?, threshold}],
                   [id: Logger.ErrorHandler, function: :watcher])]
