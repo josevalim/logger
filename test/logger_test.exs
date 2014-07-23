@@ -86,4 +86,11 @@ defmodule LoggerTest do
       Process.register(logger, Logger)
     end
   end
+
+  test "Logger.Config survives Logger exit" do
+    Process.whereis(Logger)
+      |> Process.exit(:kill)
+    wait_for_logger()
+    wait_for_handler(Logger, Logger.Config)
+  end
 end

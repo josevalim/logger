@@ -8,17 +8,35 @@ defmodule Logger.Watcher do
   Starts the watcher supervisor.
   """
   def start_link() do
-    import Supervisor.Spec
-    children = [worker(@name, [], function: :watcher, type: :temporary)]
-    options  = [strategy: :simple_one_for_one, name: @name]
-    Supervisor.start_link(children, options)
+    options  = [strategy: :one_for_one, name: @name]
+    Supervisor.start_link([], options)
   end
 
   @doc """
   Start watching a handler.
   """
   def watch(mod, handler, args) do
-    Supervisor.start_child(@name, [mod, handler, args])
+    import Supervisor.Spec
+    id = {mod, handler}
+    child = worker(__MODULE__, [mod, handler, args],
+      [id: id, function: :async_watcher, restart: :transient])
+    case Supervisor.start_child(@name, child) do
+      {:ok, _pid} = result ->
+        result
+      {:error, :already_present} ->
+        _ = Supervisor.delete_child(@name, id)
+        watch(mod, handler, args)
+      {:error, _reason} = error ->
+        error
+    end
+  end
+
+  @doc false
+  def watch(handlers) do
+    _ = for {mod, handler, args} <- handlers do
+      {:ok, _pid} = watch(mod, handler, args)
+    end
+    :ok
   end
 
   ## Callbacks
@@ -27,20 +45,22 @@ defmodule Logger.Watcher do
     GenServer.start_link(__MODULE__, {mod, handler, args})
   end
 
+  def async_watcher(mod, handler, args) do
+    {:ok, :proc_lib.spawn_link(__MODULE__, :init_it, [{mod, handler, args}])}
+  end
+
+  def init_it({_, _, _} = state) do
+    install_handler(state)
+    :gen_server.enter_loop(__MODULE__, [], state)
+  end
+
   def init({_, _, _} = state) do
     install_handler(state)
     {:ok, state}
   end
 
-  def handle_info({:gen_event_EXIT, handler, reason}, {_, handler, _} = state)
-      when reason in [:normal, :shutdown] do
+  def handle_info({:gen_event_EXIT, handler, reason}, {_, handler, _} = state) do
     {:stop, reason, state}
-  end
-
-  # TODO: We need to log the handler died
-  def handle_info({:gen_event_EXIT, handler, _reason}, {_, handler, _} = state) do
-    install_handler(state)
-    {:noreply, state}
   end
 
   def handle_info(_msg, state) do
