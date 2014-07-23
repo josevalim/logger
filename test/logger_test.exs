@@ -2,6 +2,14 @@ defmodule LoggerTest do
   use Logger.Case
   require Logger
 
+  test "add_backend/1 and remove_backend/1" do
+    assert :ok = Logger.remove_backend(:console)
+    assert capture_log(fn ->
+      assert Logger.debug("hello", []) == :ok
+    end) == ""
+    assert {:ok, _} = Logger.add_backend(:console)
+  end
+
   test "level/0" do
     assert Logger.level == :debug
   end

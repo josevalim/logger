@@ -2,12 +2,12 @@ defmodule Logger.Backends.Console do
   use GenEvent
 
   def init(_) do
-    # TODO: What happens if user is not available?
     if user = Process.whereis(:user) do
       Process.group_leader(self(), user)
+      {:ok, configure([])}
+    else
+      {:error, :nouser}
     end
-
-    {:ok, configure([])}
   end
 
   def handle_call({:configure, options}, _state) do

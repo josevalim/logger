@@ -153,14 +153,12 @@ defmodule Logger do
 
     # TODO: Start this based on the backends config
     # TODO: Runtime backend configuration
-    backends = [{Logger, Logger.Backends.Console, :ok}]
+    backends = [{Logger, Logger.Backends.Console, []}]
     options  = [strategy: :rest_for_one, name: Logger.Supervisor]
     children = [worker(GenEvent, [[name: Logger]]),
-                worker(Logger.Watcher, [Logger, Logger.Config, :ok],
+                worker(Logger.Watcher, [Logger, Logger.Config, []],
                   [id: Logger.Config, function: :watcher]),
-                supervisor(Logger.Watcher, []),
-                worker(Task, [Logger.Watcher, :watch, [backends]],
-                  [restart: :transient]),
+                supervisor(Logger.Watcher, [backends]),
                 worker(Logger.Watcher,
                   [:error_logger, Logger.ErrorHandler, {otp_reports?, threshold}],
                   [id: Logger.ErrorHandler, function: :watcher])]
@@ -248,6 +246,20 @@ defmodule Logger do
   """
   def configure(options) do
     Logger.Config.configure(Dict.take(options, [:sync_threshold, :truncate, :level]))
+  end
+
+  @doc """
+  Adds a new backend.
+  """
+  def add_backend(backend) do
+    Logger.Watcher.watch(Logger, translate_backend(backend), [])
+  end
+
+  @doc """
+  Removes a new backend.
+  """
+  def remove_backend(backend) do
+    Logger.Watcher.unwatch(Logger, translate_backend(backend))
   end
 
   @doc """

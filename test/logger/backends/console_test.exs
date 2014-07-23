@@ -8,6 +8,18 @@ defmodule Logger.Backends.ConsoleTest do
     end
   end
 
+  test "does not start when there is no user" do
+    user = Process.whereis(:user)
+
+    try do
+      Process.unregister(:user)
+      assert GenEvent.add_handler(Logger, Logger.Backends.Console, []) ==
+             {:error, :nouser}
+    after
+      Process.register(user, :user)
+    end
+  end
+
   test "can configure format" do
     Logger.configure_backend(:console, format: "$message [$level]")
 
