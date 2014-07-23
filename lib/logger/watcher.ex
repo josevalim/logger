@@ -25,7 +25,10 @@ defmodule Logger.Watcher do
   Removes the given handler.
   """
   def unwatch(mod, handler) do
-    Supervisor.terminate_child(@name, {mod, handler})
+    case Supervisor.terminate_child(@name, {mod, handler}) do
+      :ok -> Supervisor.delete_child(@name, {mod, handler})
+      res -> res
+    end
   end
 
   @doc """

@@ -43,7 +43,7 @@ Short-term features (before 1.0):
   * *done* Custom formatting.
   * *done* Metadata (via options and process dictionary).
   * Error translators, so we can translate GenServer and other OTP errors into something more palatable.
-  * Custom backends.
+  * *done* Custom backends.
 
 Long-term features (after 1.0):
 

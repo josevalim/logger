@@ -4,10 +4,16 @@ defmodule LoggerTest do
 
   test "add_backend/1 and remove_backend/1" do
     assert :ok = Logger.remove_backend(:console)
+    assert Logger.remove_backend(:console) ==
+           {:error, :not_found}
+
     assert capture_log(fn ->
       assert Logger.debug("hello", []) == :ok
     end) == ""
-    assert {:ok, _} = Logger.add_backend(:console)
+
+    assert {:ok, pid} = Logger.add_backend(:console)
+    assert Logger.add_backend(:console) ==
+           {:error, {:already_started, pid}}
   end
 
   test "level/0" do

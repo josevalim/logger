@@ -96,7 +96,7 @@ defmodule Logger do
 
   ## Backends
 
-  Logger supports different backends where log message are written to.
+  Logger supports different backends where log messages are written to.
 
   The available backends by default are:
 
@@ -108,7 +108,8 @@ defmodule Logger do
   The initial backends are loaded via the `:backends` configuration,
   which must be set before the logger application is started. However,
   backends can be added or removed dynamically via the `add_backend/2`,
-  `remove_backend/1` and `configure_backend/2` functions.
+  `remove_backend/1` and `configure_backend/2` functions. Note though
+  that dynamically added backends are not restarded in case of crashes.
 
   ### Console backend
 
@@ -136,8 +137,55 @@ defmodule Logger do
 
   ### Custom backends
 
-  TODO
+  Any developer can create their own backend for Logger.
+  Since Logger is an event manager powered by `GenEvent`,
+  writing a new backend is a matter of creating an event
+  handler, as described in the `GenEvent` module.
 
+  From now on, we will be using event handler to refer to
+  your custom backend, as we head into implementation details.
+
+  The `add_backend/1` function is used to start a new
+  backend, which installs the given event handler to the
+  Logger event manager. This event handler is automatically
+  supervised by Logger.
+
+  Once added, the handler should be able to handle events
+  in the following format:
+
+      {level, group_leader,
+        {Logger, message, timestamp, metadata}}
+
+  The level is one of `:error`, `:info`, `:warn` or `:error`,
+  as previously described, the group leader is the group
+  leader of the process who logged the message, followed by
+  a tuple starting with the atom `Logger`, the message as
+  iodata, the timestamp and a keyword list of metadata.
+
+  It is recommended that handlers ignore messages where
+  the group leader is in a different node than the one
+  the handler is installed.
+
+  Furthermore, backends can be configured via the `configure_backend/2`
+  function which requires event handlers to handle calls of
+  the following format:
+
+      {:configure, options}
+
+  where options is a keyword list. The result of the call is
+  the result returned by `configure_backend/2`. You may simply
+  return `:ok` if you don't perform any kind of validation.
+
+  It is recommended that backends support at least the following
+  configuration values:
+
+    * level - the logging level for that backend
+    * format - the logging format for that backend
+    * metadata - the metadata to include the backend
+
+  Check the implementation for `Logger.Backends.Console` for
+  examples on how to handle the recommendations in this section
+  and how to process the existing options.
   """
 
   @type backend :: GenEvent.handler
