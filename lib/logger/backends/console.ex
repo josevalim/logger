@@ -6,7 +6,7 @@ defmodule Logger.Backends.Console do
       Process.group_leader(self(), user)
       {:ok, configure([])}
     else
-      {:error, :nouser}
+      {:error, :ignore}
     end
   end
 
