@@ -1,6 +1,7 @@
 defmodule Logger.Watcher do
   @moduledoc false
 
+  require Logger
   use GenServer
   @name Logger.Watcher
 
@@ -58,20 +59,30 @@ defmodule Logger.Watcher do
 
   ## Callbacks
 
-  def init({mod, handler, args} = state) do
+  def init({mod, handler, args}) do
     case :gen_event.add_sup_handler(mod, handler, args) do
-      :ok               -> {:ok, state}
+      :ok               -> {:ok, {mod, handler}}
       {:error, :ignore} -> :ignore
       {:error, reason}  -> {:stop, reason}
       {:EXIT, reason}   -> {:stop, reason}
     end
   end
 
-  def handle_info({:gen_event_EXIT, handler, reason}, {_, handler, _} = state) do
+  def handle_info({:gen_event_EXIT, handler, reason}, {_, handler} = state)
+      when reason in [:normal, :shutdown] do
+    {:stop, reason, state}
+  end
+
+  def handle_info({:gen_event_EXIT, handler, reason}, {mod, handler} = state) do
+    Logger.error "GenEvent handler #{inspect handler} installed at #{inspect mod} " <>
+                 "exited because #{format_exit(reason)}"
     {:stop, reason, state}
   end
 
   def handle_info(_msg, state) do
     {:noreply, state}
   end
+
+  defp format_exit({:EXIT, reason}), do: Exception.format_exit(reason)
+  defp format_exit(other), do: inspect(other)
 end
