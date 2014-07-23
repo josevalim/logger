@@ -13,7 +13,17 @@ defmodule Logger.Watcher do
   end
 
   @doc """
-  Start watching a handler.
+  Watches the given handlers as part of the handler supervision tree.
+  """
+  def watch(handlers) do
+    _ = for {mod, handler, args} <- handlers do
+      {:ok, _pid} = watch(mod, handler, args)
+    end
+    :ok
+  end
+
+  @doc """
+  Watches the given handler as part of the handler supervision tree.
   """
   def watch(mod, handler, args) do
     import Supervisor.Spec
@@ -31,25 +41,26 @@ defmodule Logger.Watcher do
     end
   end
 
-  @doc false
-  def watch(handlers) do
-    _ = for {mod, handler, args} <- handlers do
-      {:ok, _pid} = watch(mod, handler, args)
-    end
-    :ok
-  end
+  @doc """
+  Starts a watcher server.
 
-  ## Callbacks
-
+  This is useful when there is a need to start a handler
+  outside of the handler supervision tree.
+  """
   def watcher(mod, handler, args) do
     GenServer.start_link(__MODULE__, {mod, handler, args})
   end
 
+  @doc """
+  Starts an async watcher.
+  """
   def async_watcher(mod, handler, args) do
-    {:ok, :proc_lib.spawn_link(__MODULE__, :init_it, [{mod, handler, args}])}
+    {:ok, :proc_lib.spawn_link(__MODULE__, :init_async, [{mod, handler, args}])}
   end
 
-  def init_it({_, _, _} = state) do
+  ## Callbacks
+
+  def init_async({_, _, _} = state) do
     install_handler(state)
     :gen_server.enter_loop(__MODULE__, [], state)
   end
