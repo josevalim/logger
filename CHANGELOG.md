@@ -1,3 +1,8 @@
+# v0.4.0
+
+* [Logger] Support custom backends
+* [Logger] Support custom translators
+
 # v0.3.0
 
 * [Logger] Requires Elixir master

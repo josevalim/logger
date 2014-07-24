@@ -42,7 +42,7 @@ Short-term features (before 1.0):
   * *done* Switching between sync and async modes.
   * *done* Custom formatting.
   * *done* Metadata (via options and process dictionary).
-  * Error translators, so we can translate GenServer and other OTP errors into something more palatable.
+  * *done* Error translators, so we can translate GenServer and other OTP errors into something more palatable.
   * *done* Custom backends.
 
 Long-term features (after 1.0):
