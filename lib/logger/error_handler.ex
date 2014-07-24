@@ -25,32 +25,35 @@ defmodule Logger.ErrorHandler do
   defp log_event({:error, _gl, {pid, format, data}}, %{otp: true}),
     do: log_event(:error, :format, pid, {format, data})
   defp log_event({:error_report, _gl, {pid, :std_error, format}}, %{otp: true}),
-    do: log_event(:error, :report, pid, format)
+    do: log_event(:error, :report, pid, {:std_error, format})
 
   defp log_event({:warning_msg, _gl, {pid, format, data}}, %{otp: true}),
     do: log_event(:warn, :format, pid, {format, data})
   defp log_event({:warning_report, _gl, {pid, :std_warning, format}}, %{otp: true}),
-    do: log_event(:warn, :report, pid, format)
+    do: log_event(:warn, :report, pid, {:std_warning, format})
 
   defp log_event({:info_msg, _gl, {pid, format, data}}, %{otp: true}),
     do: log_event(:info, :format, pid, {format, data})
   defp log_event({:info_report, _gl, {pid, :std_info, format}}, %{otp: true}),
-    do: log_event(:info, :report, pid, format)
+    do: log_event(:info, :report, pid, {:std_info, format})
 
   defp log_event(_, _state),
     do: :ok
 
   defp log_event(level, kind, pid, data) do
-    %{level: min_level, truncate: truncate, utc_log: utc_log?} = Logger.Config.__data__
+    %{level: min_level, truncate: truncate,
+      utc_log: utc_log?, translators: translators} = Logger.Config.__data__
 
-    if Logger.compare_levels(level, min_level) != :lt do
-      message = format_event(level, kind, data, truncate)
+    if Logger.compare_levels(level, min_level) != :lt &&
+       (message = translate(translators, min_level, level, kind, data, truncate)) do
+      message = Logger.Utils.truncate(message, truncate)
 
       # Mode is always async to avoid clogging the error_logger
       GenEvent.notify(Logger,
         {level, Process.group_leader(),
           {Logger, message, Logger.Utils.timestamp(utc_log?), [pid: ensure_pid(pid)]}})
     end
+
     :ok
   end
 
@@ -95,12 +98,20 @@ defmodule Logger.ErrorHandler do
     end
   end
 
-  defp format_event(_level, :report, format, truncate) do
-    Logger.Utils.truncate(Kernel.inspect(format), truncate)
+  defp translate([{mod, fun}|t], min_level, level, kind, data, truncate) do
+    case apply(mod, fun, [min_level, level, kind, data]) do
+      {:ok, iodata} -> iodata
+      :skip -> nil
+      :none -> translate(t, min_level, level, kind, data, truncate)
+    end
   end
 
-  defp format_event(_level, :format, {format, args}, truncate) do
+  defp translate([], _min_level, _level, :format, {format, args}, truncate) do
     {format, args} = Logger.Utils.inspect(format, args, truncate)
-    Logger.Utils.truncate(:io_lib.format(format, args), truncate)
+    :io_lib.format(format, args)
+  end
+
+  defp translate([], _min_level, _level, :report, {_type, data}, _truncate) do
+    Kernel.inspect(data)
   end
 end

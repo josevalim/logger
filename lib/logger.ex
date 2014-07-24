@@ -94,6 +94,12 @@ defmodule Logger do
       threshold, the error_logger enters in discard mode for the
       remaining of that second. Defaults to 500 messages.
 
+  Furthermore, Logger allows messages sent by Erlang's `error_logger`
+  to be translated into an Elixir format via translators. Translator
+  can be dynamically added at any time with the `add_translator/1`
+  and `remove_translator/1` APIs. Check `Logger.Translator` for more
+  information.
+
   ## Backends
 
   Logger supports different backends where log messages are written to.
@@ -306,10 +312,24 @@ defmodule Logger do
   end
 
   @doc """
-  Removes a new backend.
+  Removes a backend.
   """
   def remove_backend(backend) do
     Logger.Watcher.unwatch(Logger, translate_backend(backend))
+  end
+
+  @doc """
+  Adds a new translator.
+  """
+  def add_translator({mod, fun} = translator) when is_atom(mod) and is_atom(fun) do
+    Logger.Config.add_translator(translator)
+  end
+
+  @doc """
+  Removes a translator.
+  """
+  def remove_translator({mod, fun} = translator) when is_atom(mod) and is_atom(fun) do
+    Logger.Config.remove_translator(translator)
   end
 
   @doc """

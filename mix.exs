@@ -18,6 +18,7 @@ defmodule Logger.Mixfile do
            utc_log: false,
            truncate: 8096,
            backends: [:console],
+           translators: [{Logger.Translator, :translate}],
            sync_threshold: 20,
            handle_otp_reports: true,
            discard_threshold_for_error_logger: 500,

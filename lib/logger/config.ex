@@ -14,6 +14,14 @@ defmodule Logger.Config do
     GenEvent.call(Logger, @name, {:configure, options})
   end
 
+  def add_translator(translator) do
+    GenEvent.call(Logger, @name, {:add_translator, translator})
+  end
+
+  def remove_translator(translator) do
+    GenEvent.call(Logger, @name, {:remove_translator, translator})
+  end
+
   def __data__() do
     Application.get_env(:logger, @data)
   end
@@ -62,24 +70,40 @@ defmodule Logger.Config do
     {:ok, :ok, compute_state(state.mode)}
   end
 
+  def handle_call({:add_translator, translator}, state) do
+    state = update_translators(state, fn t -> [translator|List.delete(t, translator)] end)
+    {:ok, :ok, state}
+  end
+
+  def handle_call({:remove_translator, translator}, state) do
+    state = update_translators(state, &List.delete(&1, translator))
+    {:ok, :ok, state}
+  end
+
   ## Helpers
 
+  defp update_translators(%{translators: translators} = state, fun) do
+    translators = fun.(translators)
+    Application.put_env(:logger, :translators, translators)
+    persist %{state | translators: translators}
+  end
+
   defp compute_state(mode) do
-    level    = Application.get_env(:logger, :level)
-    utc_log  = Application.get_env(:logger, :utc_log)
-    truncate = Application.get_env(:logger, :truncate)
+    level       = Application.get_env(:logger, :level)
+    utc_log     = Application.get_env(:logger, :utc_log)
+    truncate    = Application.get_env(:logger, :truncate)
+    translators = Application.get_env(:logger, :translators)
 
     sync_threshold  = Application.get_env(:logger, :sync_threshold)
     async_threshold = trunc(sync_threshold * 0.75)
 
-    state =
-      %{level: level, mode: mode, truncate: truncate, utc_log: utc_log,
-        sync_threshold: sync_threshold, async_threshold: async_threshold}
-    persist(state)
-    state
+    persist %{level: level, mode: mode, truncate: truncate,
+              utc_log: utc_log, sync_threshold: sync_threshold,
+              async_threshold: async_threshold, translators: translators}
   end
 
   defp persist(state) do
     Application.put_env(:logger, @data, state)
+    state
   end
 end
