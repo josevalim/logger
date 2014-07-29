@@ -87,6 +87,14 @@ defmodule Logger.TranslatorTest do
     """
   end
 
+  test "translates application stop" do
+    :ok = Application.start(:eex)
+
+    assert capture_log(fn ->
+      Application.stop(:eex)
+    end) =~ msg("[info] Application eex exited with reason :stopped")
+  end
+
   def task(parent) do
     Process.unlink(parent)
     receive do: (:go -> raise "oops")
