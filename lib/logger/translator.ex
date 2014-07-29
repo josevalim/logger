@@ -37,6 +37,22 @@ defmodule Logger.Translator do
                     <> "State: #{inspect state}\n"
         end
         {:ok, msg <> "** (exit) " <> Exception.format_exit(reason)}
+
+      {'** gen_event handler ' ++ _, [name, manager, last, state, reason]} ->
+        msg = "GenEvent handler #{inspect name} installed in #{inspect manager} terminating\n"
+        if min_level == :debug do
+          msg = msg <> "Last message: #{inspect last}\n"
+                    <> "State: #{inspect state}\n"
+        end
+        {:ok, msg <> "** (exit) " <> Exception.format_exit(reason)}
+
+      {'** Task ' ++ _, [name, starter, function, args, reason]} ->
+        msg = "Task #{inspect name} started from #{inspect starter} terminating\n" <>
+              "Function: #{inspect function}\n" <>
+              "    Args: #{inspect args}\n" <>
+              "** (exit) " <> Exception.format_exit(reason)
+        {:ok, msg}
+
       _ ->
         :none
     end
