@@ -77,8 +77,8 @@ defmodule Logger.Watcher do
   end
 
   def handle_info({:gen_event_EXIT, handler, reason}, {mod, handler} = state) do
-    Logger.error "GenEvent handler #{inspect handler} installed at #{inspect mod} " <>
-                 "exited because #{format_exit(reason)}"
+    Logger.error "GenEvent handler #{inspect handler} installed at #{inspect mod}\n" <>
+                 "** (exit) #{format_exit(reason)}"
     {:stop, reason, state}
   end
 

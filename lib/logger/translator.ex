@@ -28,6 +28,20 @@ defmodule Logger.Translator do
   and the default messages translated by Logger.
   """
 
+  def translate(min_level, :error, :format, message) do
+    case message do
+      {'** Generic server ' ++ _, [name, last, state, reason]} ->
+        msg = "GenServer #{inspect name} terminating\n"
+        if min_level == :debug do
+          msg = msg <> "Last message: #{inspect last}\n"
+                    <> "State: #{inspect state}\n"
+        end
+        {:ok, msg <> "** (exit) " <> Exception.format_exit(reason)}
+      _ ->
+        :none
+    end
+  end
+
   def translate(_min_level, _level, _kind, _message) do
     :none
   end
