@@ -53,6 +53,12 @@ defmodule Logger do
     * `:backends` - the backends to be used. Defaults to `[:console]`.
       See the "Backends" section for more information.
 
+    * `:compile_time_purge_level` - purge all calls that have log level
+      lower than the configured value at compilation time. This means the
+      Logger call will be completely removed at compile time, occuring
+      no overhead at runtime. By default, defaults to `:debug` and only
+      applies to the `Logger.debug`, `Logger.info`, etc style of calls.
+
   ### Runtime Configuration
 
   All configuration below can be set via the config files but also
@@ -300,8 +306,10 @@ defmodule Logger do
   See the "Runtime Configuration" section in `Logger` module
   documentation for the available options.
   """
+  @valid_options [:compile_time_purge_level, :sync_threshold, :truncate, :level, :utc_log]
+
   def configure(options) do
-    Logger.Config.configure(Dict.take(options, [:sync_threshold, :truncate, :level]))
+    Logger.Config.configure(Dict.take(options, @valid_options))
   end
 
   @doc """
@@ -348,7 +356,9 @@ defmodule Logger do
 
   Developers should rather use the macros `Logger.debug/2`,
   `Logger.warn/2`, `Logger.info/2` or `Logger.error/2` instead
-  of this function as they automatically include caller metadata.
+  of this function as they automatically include caller metadata
+  and can eliminate the Logger call altogether at compile time if
+  desired.
 
   Use this function only when there is a need to log dynamically
   or you want to explicitly avoid embedding metadata.
@@ -378,10 +388,7 @@ defmodule Logger do
 
   """
   defmacro warn(chardata, metadata \\ []) do
-    caller = caller_metadata(__CALLER__)
-    quote do
-      Logger.log(:warn, unquote(chardata), unquote(caller) ++ unquote(metadata))
-    end
+    macro_log(:warn, chardata, metadata, __CALLER__)
   end
 
   @doc """
@@ -394,10 +401,7 @@ defmodule Logger do
 
   """
   defmacro info(chardata, metadata \\ []) do
-    caller = caller_metadata(__CALLER__)
-    quote do
-      Logger.log(:info, unquote(chardata), unquote(caller) ++ unquote(metadata))
-    end
+    macro_log(:info, chardata, metadata, __CALLER__)
   end
 
   @doc """
@@ -410,10 +414,7 @@ defmodule Logger do
 
   """
   defmacro error(chardata, metadata \\ []) do
-    caller = caller_metadata(__CALLER__)
-    quote do
-      Logger.log(:error, unquote(chardata), unquote(caller) ++ unquote(metadata))
-    end
+    macro_log(:error, chardata, metadata, __CALLER__)
   end
 
   @doc """
@@ -426,14 +427,20 @@ defmodule Logger do
 
   """
   defmacro debug(chardata, metadata \\ []) do
-    caller = caller_metadata(__CALLER__)
-    quote do
-      Logger.log(:debug, unquote(chardata), unquote(caller) ++ unquote(metadata))
-    end
+    macro_log(:debug, chardata, metadata, __CALLER__)
   end
 
-  defp caller_metadata(%{module: module, function: function, line: line}) do
-    [module: module, function: function, line: line]
+  defp macro_log(level, chardata, metadata, caller) do
+    min_level = Application.get_env(:logger, :compile_time_purge_level, :debug)
+    if compare_levels(level, min_level) != :lt do
+      %{module: module, function: function, line: line} = caller
+      caller = [module: module, function: function, line: line]
+      quote do
+        Logger.log(unquote(level), unquote(chardata), unquote(caller) ++ unquote(metadata))
+      end
+    else
+      :ok
+    end
   end
 
   defp truncate(data, n) when is_function(data, 0),

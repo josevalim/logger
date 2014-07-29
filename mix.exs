@@ -21,6 +21,7 @@ defmodule Logger.Mixfile do
            translators: [{Logger.Translator, :translate}],
            sync_threshold: 20,
            handle_otp_reports: true,
+           compile_time_purge_level: :debug,
            discard_threshold_for_error_logger: 500,
            console: []]]
   end

@@ -106,6 +106,30 @@ defmodule LoggerTest do
     end) =~ msg("[error] hello")
   end
 
+  test "remove unused calls at compile time" do
+    Logger.configure(compile_time_purge_level: :info)
+
+    defmodule Sample do
+      def debug do
+        Logger.debug "hello"
+      end
+
+      def info do
+        Logger.info "hello"
+      end
+    end
+
+    assert capture_log(fn ->
+      assert Sample.debug == :ok
+    end) == ""
+
+    assert capture_log(fn ->
+      assert Sample.info == :ok
+    end) =~ msg("[info] hello")
+  after
+    Logger.configure(compile_time_purge_level: :debug)
+  end
+
   test "log/2 truncates messages" do
     Logger.configure(truncate: 4)
     assert capture_log(fn ->
