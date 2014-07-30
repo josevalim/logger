@@ -159,4 +159,17 @@ defmodule LoggerTest do
     wait_for_logger()
     wait_for_handler(Logger, Logger.Config)
   end
+
+  test "Logger.Config can restart the application" do
+    Application.put_env(:logger, :backends, [])
+    Logger.Config.restart()
+
+    assert capture_log(fn ->
+      assert Logger.debug("hello", []) == :ok
+    end) == ""
+
+    assert {:ok, pid} = Logger.add_backend(:console)
+    assert Logger.add_backend(:console) ==
+           {:error, {:already_started, pid}}
+  end
 end
