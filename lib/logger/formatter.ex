@@ -59,8 +59,8 @@ defmodule Logger.Formatter do
   If you would like to make your own custom formatter simply pass
   `{module, function}` to compile and the rest is handled.
 
-    iex> Logger.Formatter.compile("$time $metadata [$level] $message\n")
-    [:time, " ", :metadata, " [", :level, "] ", :message, "\n"]
+      iex> Logger.Formatter.compile("$time $metadata [$level] $message\n")
+      [:time, " ", :metadata, " [", :level, "] ", :message, "\n"]
   """
   @spec compile(binary | nil) :: list()
   @spec compile({atom, atom}) :: {atom, atom}
@@ -69,11 +69,11 @@ defmodule Logger.Formatter do
   def compile({mod, fun}) when is_atom(mod) and is_atom(fun), do: {mod, fun}
 
   def compile(str) do
-    for code <- Regex.split(~r/(\$[a-z]+)/, str, trim: true) do
-      if String.starts_with?(code, "$") do
-        code = code |> String.slice(1..-1) |> String.to_atom
+    for part <- Regex.split(~r/(?<head>)\$[a-z]+(?<tail>)/, str, on: [:head, :tail], trim: true) do
+      case part do
+        "$" <> code -> compile_code(String.to_atom(code))
+        _           -> part
       end
-      compile_code(code)
     end
   end
 
@@ -81,7 +81,6 @@ defmodule Logger.Formatter do
   defp compile_code(key) when is_atom(key) do
     raise(ArgumentError, message: "$#{key} is an invalid format pattern.")
   end
-  defp compile_code(other) when is_binary(other), do: other
 
   @doc """
   Takes a compiled format and injects the, level, timestamp, message and
