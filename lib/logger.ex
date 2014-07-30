@@ -208,51 +208,26 @@ defmodule Logger do
   def start(_type, _args) do
     import Supervisor.Spec
 
-    otp_reports? = Application.get_env(:logger, :handle_otp_reports)
-    threshold    = Application.get_env(:logger, :discard_threshold_for_error_logger)
+    Application.put_env(:logger, :deleted_handlers, HashSet.new())
 
-    handlers =
-      for backend <- Application.get_env(:logger, :backends) do
-        {Logger, translate_backend(backend), []}
-      end
-
-    options  = [strategy: :rest_for_one, name: Logger.Supervisor]
+    options  = [strategy: :one_for_all, name: Logger.Supervisor]
     children = [worker(GenEvent, [[name: Logger]]),
-                worker(Logger.Watcher, [Logger, Logger.Config, []],
-                  [id: Logger.Config, function: :watcher]),
-                supervisor(Logger.Watcher, [handlers]),
-                worker(Logger.Watcher,
-                  [:error_logger, Logger.ErrorHandler, {otp_reports?, threshold}],
-                  [id: Logger.ErrorHandler, function: :watcher])]
+                supervisor(Logger.Watcher.Supervisor, []),
+                worker(Logger.Reloader, [])]
 
-    case Supervisor.start_link(children, options) do
-      {:ok, sup} ->
-        reenable_tty? = delete_error_logger_handler(otp_reports?, :error_logger_tty_h)
-        {:ok, sup, reenable_tty?}
-      {:error, _reason} = error ->
-        error
-    end
+    Supervisor.start_link(children, options)
   end
 
   @doc false
-  def stop(reenable_tty?) do
-    add_error_logger_handler(reenable_tty?, :error_logger_tty_h)
+  def stop(_) do
+    Application.get_env(:logger, :deleted_handlers)
+      |> Enum.each(&:error_logger.add_report_handler/1)
 
     # We need to do this in another process as the Application
     # Controller is currently blocked shutting down this app.
     spawn_link(fn -> Logger.Config.clear_data end)
 
     :ok
-  end
-
-  defp add_error_logger_handler(was_enabled?, handler) do
-    was_enabled? and :error_logger.add_report_handler(handler)
-    :ok
-  end
-
-  defp delete_error_logger_handler(should_delete?, handler) do
-    should_delete? and
-      :error_logger.delete_report_handler(handler) != {:error, :module_not_found}
   end
 
   @metadata :logger_metadata
@@ -348,8 +323,9 @@ defmodule Logger do
     GenEvent.call(Logger, translate_backend(backend), {:configure, options})
   end
 
-  defp translate_backend(:console), do: Logger.Backends.Console
-  defp translate_backend(other),    do: other
+  @doc false
+  def translate_backend(:console), do: Logger.Backends.Console
+  def translate_backend(other),    do: other
 
   @doc """
   Logs a message.
