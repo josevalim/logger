@@ -1,6 +1,8 @@
 Logger
 ======
 
+**Note: this project has been merged into Elixir and is available since v0.15.0**
+
 The goal of this project is to explore a Logger implementation that will be included in Elixir. One of the big influences for this project is [Lager](https://github.com/basho/lager) and [Andrew's talk on the matter](http://www.youtube.com/watch?v=8BNpOHFvg_Q).
 
 Obviously, one of the first questions may be: why not Lager? We need a project that knows how to log terms in Elixir syntax, in particular, using the `Inspect` protocol. That's why the focus of this project is on the error handler and not on the error logger itself.

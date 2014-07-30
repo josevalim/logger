@@ -3,8 +3,8 @@ defmodule Logger.Mixfile do
 
   def project do
     [app: :logger,
-     version: "0.4.0-dev",
-     elixir: "~> 0.14.4-dev or ~> 0.15.0-dev",
+     version: "0.4.0",
+     elixir: "~> 0.15.0-dev",
      deps: deps]
   end
 
