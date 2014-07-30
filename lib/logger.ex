@@ -226,17 +226,19 @@ defmodule Logger do
                   [id: Logger.ErrorHandler, function: :watcher])]
 
     case Supervisor.start_link(children, options) do
-      {:ok, sup} ->
-        reenable_tty? = delete_error_logger_handler(otp_reports?, :error_logger_tty_h)
-        {:ok, sup, reenable_tty?}
-      {:error, _reason} = error ->
+      {:ok, _} = ok ->
+        deleted = delete_error_logger_handler(otp_reports?, :error_logger_tty_h, [])
+        store_deleted_handlers(deleted)
+        ok
+      {:error, _} = error ->
         error
     end
   end
 
   @doc false
-  def stop(reenable_tty?) do
-    add_error_logger_handler(reenable_tty?, :error_logger_tty_h)
+  def stop(_) do
+    Application.get_env(:logger, :deleted_handlers)
+    |> Enum.each(&:error_logger.add_report_handler/1)
 
     # We need to do this in another process as the Application
     # Controller is currently blocked shutting down this app.
@@ -245,14 +247,17 @@ defmodule Logger do
     :ok
   end
 
-  defp add_error_logger_handler(was_enabled?, handler) do
-    was_enabled? and :error_logger.add_report_handler(handler)
-    :ok
+  defp store_deleted_handlers(list) do
+    Application.put_env(:logger, :deleted_handlers, Enum.into(list, HashSet.new))
   end
 
-  defp delete_error_logger_handler(should_delete?, handler) do
-    should_delete? and
-      :error_logger.delete_report_handler(handler) != {:error, :module_not_found}
+  defp delete_error_logger_handler(should_delete?, handler, deleted) do
+    if should_delete? and
+         :error_logger.delete_report_handler(handler) != {:error, :module_not_found} do
+      [handler|deleted]
+    else
+      deleted
+    end
   end
 
   @metadata :logger_metadata
