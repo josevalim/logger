@@ -49,7 +49,7 @@ Short-term features (before 1.0):
 
 Long-term features (after 1.0):
 
-  * SASL reports.
+  * *done* SASL reports.
   * Logging to files and log rotation.
   * Tracing.
 
